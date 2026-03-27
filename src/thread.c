@@ -2,9 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
-#include <sys/queue.h> //ana maendish f pc donc maert
+#include <sys/queue.h>
 
-//we will need to download and include queue.h from the github they gave us maybe ? idk?
 #define SizeStack	8192
 
 enum threadState {
@@ -20,23 +19,25 @@ struct thread_s {
     enum threadState state;
     void *retval;
     struct thread_s *joiningThread; 
-    TAILQ_ENTRY(thread_s) entries; /* Référence à la struct taguée */
+    TAILQ_ENTRY(thread_s) entries; // reference au thread suivant et thread precedent
 };
 
-/* On crée ensuite l'alias pour simplifier le code */
 typedef struct thread_s thread_s;
 
-TAILQ_HEAD(threadQueue, thread_s) readyQueue; //this our queue for ready threads (should we do just one for all threads or one per state dber rask a adam nta o prof)
-//matalan hna threadQueue hya smya d struct o readyQueue hya smya d variable li hiya queue dyalna
+// on definit le type des listes double chainées qu'on va utiliser
+TAILQ_HEAD(threadQueue, thread_s);
+
+struct threadQueue readyQueue;
+struct threadQueue blockedQueue;
 
 thread_s* currentThread;
 
-//the main function should be the first thread created and added to the queue + init queue + implemement threads.h
-
+//the main function should be the first thread created
 void thread_init() {
-    TAILQ_INIT(&readyQueue);
+    // on initialise la readyqueue à NULL en debut
+    (&readyQueue)->tqh_first = NULL; 
+    (&readyQueue)->tqh_last = &(&readyQueue)->tqh_first;
 
-    // 2. Allouer le thread_s pour le thread principal (le main)
     currentThread = (thread_s*) malloc(sizeof(thread_s));
     if (currentThread == NULL) {
         perror("Erreur d'allocation pour le thread principal");
@@ -45,9 +46,9 @@ void thread_init() {
 
     currentThread->state = RUNNING;
     currentThread->joiningThread = NULL;
-    currentThread->stack = NULL; // Le main a déjà sa propre pile gérée par l'OS
+    currentThread->stack = NULL; // pile principale
 
-    // 4. Sauvegarder le contexte actuel d'exécution dans ce thread
+    // sauvegarder le contexte actuel d'exécution dans ce thread
     if (getcontext(&currentThread->context) == -1) {
         perror("Erreur lors du getcontext du main");
         exit(EXIT_FAILURE);
