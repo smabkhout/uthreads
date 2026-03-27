@@ -96,7 +96,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     makecontext(&newThread->context, (void (*)(void))func, 1, arg);
     *createdThread = (thread_t)newThread;
 
-    TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
+    //TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
     return 0;
 }
 
@@ -109,10 +109,11 @@ int thread_yield(){
     thread_s *nextThread = TAILQ_FIRST(&readyQueue);
     TAILQ_REMOVE(&readyQueue, nextThread, entries);
 
-    oldThread->state = READY;
+    if (oldThread->state == RUNNING) {
+        oldThread->state = READY;
+        TAILQ_INSERT_TAIL(&readyQueue, oldThread, entries);
+    }
     nextThread->state = RUNNING;
-
-    TAILQ_INSERT_TAIL(&readyQueue, oldThread, entries);
 
     currentThread = nextThread;
     swapcontext(&oldThread->context, &nextThread->context);
@@ -122,15 +123,15 @@ int thread_yield(){
 int thread_join(thread_t thread, void **retval){
     thread_s* oldCurrentThread = currentThread;
     thread_s* targetThread = (thread_s *)thread;
-    if (targetThread->state != TERMINATED){
-        targetThread->joiningThread = oldCurrentThread;
-        currentThread->state = BLOCKED;
-        TAILQ_INSERT_TAIL(&blockedQueue, oldCurrentThread, entries);
-    }
+    
     TAILQ_INSERT_TAIL(&readyQueue, targetThread, entries);
 
-    if (thread_yield() != 0) {
-        return -1;
+    if (targetThread->state != TERMINATED){
+        targetThread->joiningThread = oldCurrentThread;
+        oldCurrentThread->state = BLOCKED;
+        TAILQ_INSERT_TAIL(&blockedQueue, oldCurrentThread, entries);
+        
+        thread_yield(); // L'appelant bloque et passe la main
     }
     if (retval != NULL) {
         *retval = targetThread->retval; 
@@ -144,7 +145,6 @@ int thread_join(thread_t thread, void **retval){
 
 // on specifie à gcc que la fct ne retourne pas pour eviter les warnings
 __attribute__((noreturn)) void thread_exit(void *retval) {
-    thread_s* oldCurrentThred = currentThread;
     currentThread->retval = retval;
     currentThread->state = TERMINATED;
 
@@ -162,9 +162,6 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     
     nextThread->state = RUNNING;
     currentThread = nextThread;
-
-    free(oldCurrentThred->stack);
-    free(oldCurrentThred);
 
     setcontext(&nextThread->context);
     assert(0);
