@@ -64,6 +64,9 @@ thread_t thread_self() {
 }
 
 int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
+    if (currentThread == NULL) {
+        thread_init();
+    }
     thread_s *newThread = (thread_s*) malloc(sizeof(thread_s));
     if (newThread == NULL) return -1;
 

@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -Isrc -pthread
+CFLAGS=-Wall -Wextra -g -Isrc -pthread
 
 SRC=$(wildcard src/*.c)
 TESTS=$(wildcard test/*.c)
