@@ -39,6 +39,20 @@ int init_done = 0;
 
 static thread_s mainThread;
 
+// pour que si un thread autre aue main finit l'execution en dernier il peut free son stack son probleme 
+static char exitStack[8192];
+// il faut lui donner ce contexte avec cette stack avant de free so stack "dynamique"
+static ucontext_t exitContext;
+
+
+static void exitFunc() {
+    if (currentThread != &mainThread) {
+        free(currentThread->stack);
+        free(currentThread);
+    }
+    exit(0);
+}
+
 //the main function should be the first thread created
 void thread_init() {
     if (init_done) return;
@@ -52,11 +66,17 @@ void thread_init() {
     currentThread->joiningThread = NULL;
     currentThread->stack = NULL; // pile principale
 
-    // sauvegarder le contexte actuel d'exécution dans ce thread
     if (getcontext(&currentThread->context) == -1) {
         perror("Erreur lors du getcontext du main");
         exit(EXIT_FAILURE);
     }
+
+    // contexte de sortie
+    getcontext(&exitContext);
+    exitContext.uc_stack.ss_sp = exitStack;
+    exitContext.uc_stack.ss_size = 8192;
+    exitContext.uc_link = NULL;
+    makecontext(&exitContext, exitFunc, 0);
 }
 
 thread_t thread_self() {
@@ -165,22 +185,25 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
         currentThread->joiningThread = NULL;
     }
 
-    if (currentThread == &mainThread) {
-        thread_s *tmp;
-        while ((tmp = TAILQ_FIRST(&readyQueue)) != NULL) {
-            TAILQ_REMOVE(&readyQueue, tmp, entries);
-            if (tmp->stack) free(tmp->stack);
-            free(tmp);
-        }
-        while ((tmp = TAILQ_FIRST(&blockedQueue)) != NULL) {
-            TAILQ_REMOVE(&blockedQueue, tmp, entries);
-            if (tmp->stack) free(tmp->stack);
-            free(tmp);
-        }
-        exit(0);
-    }
+    // if (currentThread == &mainThread) {
+    //     thread_s *tmp;
+    //     while ((tmp = TAILQ_FIRST(&readyQueue)) != NULL) {
+    //         TAILQ_REMOVE(&readyQueue, tmp, entries);
+    //         if (tmp->stack) free(tmp->stack);
+    //         free(tmp);
+    //     }
+    //     while ((tmp = TAILQ_FIRST(&blockedQueue)) != NULL) {
+    //         TAILQ_REMOVE(&blockedQueue, tmp, entries);
+    //         if (tmp->stack) free(tmp->stack);
+    //         free(tmp);
+    //     }
+    //     exit(0);
+    // }
 
-    if (TAILQ_EMPTY(&readyQueue)) exit(0); 
+    if (TAILQ_EMPTY(&readyQueue)) {
+        setcontext(&exitContext);
+        assert(0); // i ldoit quitter avec le exitcontext
+    }
 
     thread_s *nextThread = TAILQ_FIRST(&readyQueue);
     TAILQ_REMOVE(&readyQueue, nextThread, entries);
