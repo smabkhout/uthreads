@@ -1,6 +1,5 @@
-IDIR=../include
 CC=gcc
-CFLAGS=-Wall -Wextra -I$(IDIR) -pthread
+CFLAGS=-Wall -Wextra -Isrc -pthread
 
 SRC=$(wildcard src/*.c)
 TESTS=$(wildcard test/*.c)
