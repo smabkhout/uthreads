@@ -18,6 +18,8 @@ struct thread_s {
     ucontext_t context;
     void *stack;
     enum threadState state;
+    void *(*func)(void *);
+    void *arg;
     void *retval;
     struct thread_s *joiningThread; 
     TAILQ_ENTRY(thread_s) entries; // reference au thread suivant et thread precedent
@@ -60,6 +62,11 @@ thread_t thread_self() {
     return (thread_t) currentThread;
 }
 
+static void thread_wrapper(thread_s *th) {
+    void *retval = th->func(th->arg);
+    thread_exit(retval);
+}
+
 int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     if (currentThread == NULL) {
         thread_init();
@@ -89,11 +96,14 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     newThread->state = READY;
     newThread->joiningThread = NULL;
 
-    // specifier la fonction à executer quand on appelle ce contexte
-    makecontext(&newThread->context, (void (*)(void))func, 1, arg);
+    newThread->func = func;
+    newThread->arg = arg;
+
+    // We MUST use the wrapper to intercept the return value!
+    makecontext(&newThread->context, (void (*)(void))thread_wrapper, 1, newThread);
     *createdThread = (thread_t)newThread;
 
-    //TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
+    TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
     return 0;
 }
 
@@ -121,8 +131,6 @@ int thread_join(thread_t thread, void **retval){
     thread_s* oldCurrentThread = currentThread;
     thread_s* targetThread = (thread_s *)thread;
     
-    TAILQ_INSERT_TAIL(&readyQueue, targetThread, entries);
-
     if (targetThread->state != TERMINATED){
         targetThread->joiningThread = oldCurrentThread;
         oldCurrentThread->state = BLOCKED;
