@@ -166,19 +166,18 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     }
 
     if (currentThread == &mainThread) {
-        // on free tous les thred de la ready queue
         thread_s *tmp;
         while ((tmp = TAILQ_FIRST(&readyQueue)) != NULL) {
             TAILQ_REMOVE(&readyQueue, tmp, entries);
             if (tmp->stack) free(tmp->stack);
             free(tmp);
         }
-        // on free tous les thred de la blocked queue
         while ((tmp = TAILQ_FIRST(&blockedQueue)) != NULL) {
             TAILQ_REMOVE(&blockedQueue, tmp, entries);
             if (tmp->stack) free(tmp->stack);
             free(tmp);
         }
+        exit(0);
     }
 
     if (TAILQ_EMPTY(&readyQueue)) exit(0); 
