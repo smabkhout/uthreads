@@ -15,6 +15,8 @@ static void * threadfunc(void * arg)
 
 int main(int argc, char *argv[])
 {
+  (void) argc;
+  (void) argv;
   thread_t thread1, thread2;
   void *retval1, *retval2;
   int err;
