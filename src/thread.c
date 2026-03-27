@@ -35,18 +35,15 @@ thread_s* currentThread;
 
 int init_done = 0;
 
+static thread_s mainThread;
+
 //the main function should be the first thread created
 void thread_init() {
     init_done = 1;
-    // on initialise la readyqueue à NULL en debut
     TAILQ_INIT(&readyQueue);
     TAILQ_INIT(&blockedQueue);
 
-    currentThread = (thread_s*) malloc(sizeof(thread_s));
-    if (currentThread == NULL) {
-        perror("Erreur d'allocation pour le thread principal");
-        exit(EXIT_FAILURE);
-    }
+    currentThread = &mainThread;
 
     currentThread->state = RUNNING;
     currentThread->joiningThread = NULL;
