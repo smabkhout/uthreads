@@ -41,6 +41,7 @@ static thread_s mainThread;
 
 //the main function should be the first thread created
 void thread_init() {
+    if (init_done) return;
     init_done = 1;
     TAILQ_INIT(&readyQueue);
     TAILQ_INIT(&blockedQueue);
@@ -59,11 +60,12 @@ void thread_init() {
 }
 
 thread_t thread_self() {
+    if (!init_done) thread_init();
     return (thread_t) currentThread;
 }
 
-static void thread_wrapper(thread_s *th) {
-    void *retval = th->func(th->arg);
+static void thread_wrapper(thread_s *thread) {
+    void *retval = thread->func(thread->arg);
     thread_exit(retval);
 }
 
@@ -130,6 +132,8 @@ int thread_yield(){
 int thread_join(thread_t thread, void **retval){
     thread_s* oldCurrentThread = currentThread;
     thread_s* targetThread = (thread_s *)thread;
+
+    if (targetThread == NULL) return -1;
     
     if (targetThread->state != TERMINATED){
         targetThread->joiningThread = oldCurrentThread;
@@ -142,8 +146,9 @@ int thread_join(thread_t thread, void **retval){
         *retval = targetThread->retval; 
     }
 
-    free(targetThread->stack);
-    free(targetThread);
+    if (targetThread->stack) free(targetThread->stack);
+    
+    if (targetThread != &mainThread) free(targetThread);
 
     return 0;
 }
@@ -160,7 +165,23 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
         currentThread->joiningThread = NULL;
     }
 
-    if (TAILQ_EMPTY(&readyQueue)) { exit(0); }
+    if (currentThread == &mainThread) {
+        // on free tous les thred de la ready queue
+        thread_s *tmp;
+        while ((tmp = TAILQ_FIRST(&readyQueue)) != NULL) {
+            TAILQ_REMOVE(&readyQueue, tmp, entries);
+            if (tmp->stack) free(tmp->stack);
+            free(tmp);
+        }
+        // on free tous les thred de la blocked queue
+        while ((tmp = TAILQ_FIRST(&blockedQueue)) != NULL) {
+            TAILQ_REMOVE(&blockedQueue, tmp, entries);
+            if (tmp->stack) free(tmp->stack);
+            free(tmp);
+        }
+    }
+
+    if (TAILQ_EMPTY(&readyQueue)) exit(0); 
 
     thread_s *nextThread = TAILQ_FIRST(&readyQueue);
     TAILQ_REMOVE(&readyQueue, nextThread, entries);
