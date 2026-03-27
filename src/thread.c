@@ -167,7 +167,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     free(oldCurrentThred);
 
     setcontext(&nextThread->context);
-    assert(0); // on ne doit jammais arriver ici
+    assert(0);
 }
 
 
