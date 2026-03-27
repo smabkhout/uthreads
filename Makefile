@@ -18,6 +18,7 @@ build_tests: install/lib/libthread.a $(TEST_BINS)
 
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a
+	mkdir -p install/bin
 	$(CC) $(CFLAGS) $< install/lib/libthread.a -o $@
 
 pthreads: $(TESTS)

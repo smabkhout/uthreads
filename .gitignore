@@ -1,5 +1,7 @@
-install/bin/
+install/bin/*
 
 install/lib/*
+
+test/*
 
 *.o
