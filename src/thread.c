@@ -165,3 +165,35 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     setcontext(&nextThread->context);
     assert(0); // on ne doit jammais arriver ici
 }
+
+
+
+int thread_mutex_init(thread_mutex_t *m)
+{
+    if (!m) return -1;
+    m->dummy = 0;
+    return 0;
+}
+int thread_mutex_destroy(thread_mutex_t *m)
+{
+    if (!m) return -1;
+    m->dummy = 0;
+    return 0;
+}
+
+int thread_mutex_lock(thread_mutex_t *m)
+{
+    if (!m) return -1;
+    while (m->dummy) {
+        thread_yield();
+    }
+    m->dummy = 1;
+    return 0;
+}
+
+int thread_mutex_unlock(thread_mutex_t *m)
+{
+    if (!m) return -1;
+    m->dummy = 0;
+    return 0;
+}
