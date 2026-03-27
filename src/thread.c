@@ -33,8 +33,11 @@ struct threadQueue blockedQueue;
 
 thread_s* currentThread;
 
+int init_done = 0;
+
 //the main function should be the first thread created
 void thread_init() {
+    init_done = 1;
     // on initialise la readyqueue à NULL en debut
     TAILQ_INIT(&readyQueue);
     TAILQ_INIT(&blockedQueue);
@@ -57,9 +60,6 @@ void thread_init() {
 }
 
 thread_t thread_self() {
-    if (currentThread == NULL) {
-        thread_init();
-    }
     return (thread_t) currentThread;
 }
 
@@ -103,7 +103,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 int thread_yield(){
     thread_s *oldThread = currentThread;
     //cas si il y a personne d'autre
-    if (TAILQ_EMPTY(&readyQueue)){
+    if (init_done == 0 || TAILQ_EMPTY(&readyQueue)) {
         return 0;
     }
     thread_s *nextThread = TAILQ_FIRST(&readyQueue);
@@ -144,6 +144,7 @@ int thread_join(thread_t thread, void **retval){
 
 // on specifie à gcc que la fct ne retourne pas pour eviter les warnings
 __attribute__((noreturn)) void thread_exit(void *retval) {
+    thread_s* oldCurrentThred = currentThread;
     currentThread->retval = retval;
     currentThread->state = TERMINATED;
 
@@ -161,6 +162,9 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     
     nextThread->state = RUNNING;
     currentThread = nextThread;
+
+    free(oldCurrentThred->stack);
+    free(oldCurrentThred);
 
     setcontext(&nextThread->context);
     assert(0); // on ne doit jammais arriver ici
