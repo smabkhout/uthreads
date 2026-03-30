@@ -5,6 +5,9 @@
 #include <sys/queue.h>
 #include <assert.h>
 
+#include <valgrind/valgrind.h>
+
+
 #define SizeStack	8192
 
 enum threadState {
@@ -17,6 +20,7 @@ enum threadState {
 struct thread_s {
     ucontext_t context;
     void *stack;
+    int valgrind_stackid; //pour valgrind
     enum threadState state;
     void *(*func)(void *);
     void *arg;
@@ -101,6 +105,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
         free(newThread);
         return -1;
     }
+    
 
     if (getcontext(&newThread->context) == -1) {
         free(newThread->stack);
@@ -111,9 +116,12 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     newThread->context.uc_stack.ss_sp = newThread->stack;
     newThread->context.uc_stack.ss_size = SizeStack;
     newThread->context.uc_stack.ss_flags = 0;
+
     
-    // on le laisse a null mais ca doit aller a joining thread, on pourra le changer apres
     newThread->context.uc_link = NULL; 
+
+    newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->context.uc_stack.ss_sp,
+                                               newThread->context.uc_stack.ss_sp + newThread->context.uc_stack.ss_size);
 
     newThread->state = READY;
     newThread->joiningThread = NULL;
@@ -185,22 +193,8 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
         currentThread->joiningThread = NULL;
     }
 
-    // if (currentThread == &mainThread) {
-    //     thread_s *tmp;
-    //     while ((tmp = TAILQ_FIRST(&readyQueue)) != NULL) {
-    //         TAILQ_REMOVE(&readyQueue, tmp, entries);
-    //         if (tmp->stack) free(tmp->stack);
-    //         free(tmp);
-    //     }
-    //     while ((tmp = TAILQ_FIRST(&blockedQueue)) != NULL) {
-    //         TAILQ_REMOVE(&blockedQueue, tmp, entries);
-    //         if (tmp->stack) free(tmp->stack);
-    //         free(tmp);
-    //     }
-    //     exit(0);
-    // }
-
     if (TAILQ_EMPTY(&readyQueue)) {
+        VALGRIND_STACK_DEREGISTER(currentThread->valgrind_stackid);
         setcontext(&exitContext);
         assert(0); // i ldoit quitter avec le exitcontext
     }
