@@ -32,15 +32,19 @@ static void * thfunc(void *_nbth)
         assert(!err);
 
         for(i=0; i<(nbyield*nbth); i++) {
+            printf("je suis le th %p \n" ,thread_self());
             thread_yield();
         }
 
         err = thread_join(th, &res);
+        printf("l addresse de th: %p\n", &th);
         assert(!err);
         assert(res == ((char*)_nbth)-1);
     }
     else {
         for(i=0; i<(nbyield*nbthread); i++) {
+            printf("je suis le th %p dasn else \n" ,thread_self());
+
             thread_yield();
         }
     }
