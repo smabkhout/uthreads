@@ -5,3 +5,7 @@ install/lib/*
 test/*
 
 *.o
+*.pdf
+*.out
+*.log
+*.aux
