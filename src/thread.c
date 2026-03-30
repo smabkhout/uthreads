@@ -164,16 +164,22 @@ int thread_join(thread_t thread, void **retval){
 
     if (targetThread == NULL) return -1;
     
-    if (targetThread->state != TERMINATED){
+        
+
+
+    if (targetThread->state == READY){
         targetThread->joiningThread = oldCurrentThread;
         oldCurrentThread->state = BLOCKED;
         TAILQ_INSERT_TAIL(&blockedQueue, oldCurrentThread, entries);
-        
-        if (TAILQ_EMPTY(&readyQueue) && !TAILQ_EMPTY(&blockedQueue)) {
-            return EDEADLK; // aucun nthread n'est pret, tout est blocke
-        }
         thread_yield(); // L'appelant bloque et passe la main
+    } else if (targetThread->state == BLOCKED) {
+        // il y aura surement un deadlock à un certain moment
+        TAILQ_REMOVE(&blockedQueue, oldCurrentThread, entries);
+        oldCurrentThread->state = RUNNING;
+        targetThread->joiningThread = NULL;
+        return EDEADLK; 
     }
+
     if (retval != NULL) {
         *retval = targetThread->retval; 
     }
