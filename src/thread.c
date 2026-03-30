@@ -34,6 +34,7 @@ typedef struct thread_s thread_s;
 
 // on definit le type des listes double chainées qu'on va utiliser
 TAILQ_HEAD(threadQueue, thread_s);
+TAILQ_HEAD(mutexQueue, thread_s);
 
 struct threadQueue readyQueue;
 struct threadQueue blockedQueue;
@@ -163,9 +164,6 @@ int thread_join(thread_t thread, void **retval){
     thread_s* targetThread = (thread_s *)thread;
 
     if (targetThread == NULL) return -1;
-    
-        
-
 
     if (targetThread->state == READY){
         targetThread->joiningThread = oldCurrentThread;
@@ -187,6 +185,7 @@ int thread_join(thread_t thread, void **retval){
             thread_yield();
         }
     }
+    
     if (retval != NULL) {
         *retval = targetThread->retval; 
     }
@@ -230,17 +229,20 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
 }
 
 
-
+// 0 est unlocked
 int thread_mutex_init(thread_mutex_t *m)
 {
     if (!m) return -1;
     m->dummy = 0;
+    m->waitingQueue = (struct mutexQueue*) malloc(sizeof(struct mutexQueue));
+    TAILQ_INIT((struct mutexQueue*) m->waitingQueue);
     return 0;
 }
 int thread_mutex_destroy(thread_mutex_t *m)
 {
     if (!m) return -1;
     m->dummy = 0;
+    free(m->waitingQueue);
     return 0;
 }
 
@@ -248,8 +250,14 @@ int thread_mutex_lock(thread_mutex_t *m)
 {
     if (!m) return -1;
     while (m->dummy) {
+        currentThread->state = BLOCKED;
+        TAILQ_INSERT_TAIL((struct mutexQueue*) m->waitingQueue, currentThread, entries);
+        //TAILQ_INSERT_TAIL(&blockedQueue, currentThread, entries);
         thread_yield();
     }
+    // while (m->dummy) {
+    //     thread_yield();
+    // }
     m->dummy = 1;
     return 0;
 }
@@ -258,5 +266,12 @@ int thread_mutex_unlock(thread_mutex_t *m)
 {
     if (!m) return -1;
     m->dummy = 0;
+    if (!TAILQ_EMPTY((struct mutexQueue*) m->waitingQueue)) {
+        thread_s* myTurnThread = TAILQ_FIRST((struct mutexQueue*) m->waitingQueue);
+        TAILQ_REMOVE((struct mutexQueue*) m->waitingQueue, myTurnThread, entries);
+        //TAILQ_REMOVE(&blockedQueue, myTurnThread, entries);
+        myTurnThread->state = READY;
+        TAILQ_INSERT_TAIL(&readyQueue, myTurnThread, entries);        
+    }
     return 0;
 }
