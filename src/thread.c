@@ -178,9 +178,12 @@ int thread_join(thread_t thread, void **retval){
         *retval = targetThread->retval; 
     }
 
-    if (targetThread->stack) free(targetThread->stack);
     
-    if (targetThread != &mainThread) free(targetThread);
+    
+    if (targetThread != &mainThread) {
+        if (targetThread->stack) free(targetThread->stack);
+        free(targetThread);
+    }
 
     return 0;
 }
