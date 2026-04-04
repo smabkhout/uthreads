@@ -23,8 +23,11 @@ enum threadState {
 };
 
 struct thread_s {
-    //ucontext_t context;
+#ifdef USE_CONTEXT
+    ucontext_t context;
+#else
     jmp_buf env;
+#endif
     void *stack;
     int valgrind_stackid; //pour valgrind
     enum threadState state;
@@ -50,12 +53,14 @@ int init_done = 0;
 
 static thread_s mainThread;
 
-// // pour que si un thread autre aue main finit l'execution en dernier il peut free son stack son probleme 
-// static char exitStack[8192];
-// // il faut lui donner ce contexte avec cette stack avant de free so stack "dynamique"
-// static ucontext_t exitContext;
-
+#ifdef USE_CONTEXT
+// pour que si un thread autre que main finit l'execution en dernier il peut free son stack son probleme
+static char exitStack[8192];
+// il faut lui donner ce contexte avec cette stack avant de free so stack "dynamique"
+static ucontext_t exitContext;
+#else
 static jmp_buf exitEnv;
+#endif
 
 
 static void exitFunc() {
@@ -88,23 +93,24 @@ void thread_init() {
     currentThread->joiningThread = NULL;
     currentThread->stack = NULL; // pile principale
 
-    // if (getcontext(&currentThread->context) == -1) {
-    //     perror("Erreur lors du getcontext du main");
-    //     exit(EXIT_FAILURE);
-    // }
+#ifdef USE_CONTEXT
+    if (getcontext(&currentThread->context) == -1) {
+        perror("Erreur lors du getcontext du main");
+        exit(EXIT_FAILURE);
+    }
 
-
-    // enregistre le contexte actuel
+    // contexte de sortie
+    getcontext(&exitContext);
+    exitContext.uc_stack.ss_sp = exitStack;
+    exitContext.uc_stack.ss_size = 8192;
+    exitContext.uc_link = NULL;
+    makecontext(&exitContext, exitFunc, 0);
+#else
+    /* enregistre le contexte actuel */
     if (setjmp(exitEnv) != 0) {
         exitFunc();
     }
-
-    // // contexte de sortie
-    // getcontext(&exitContext);
-    // exitContext.uc_stack.ss_sp = exitStack;
-    // exitContext.uc_stack.ss_size = 8192;
-    // exitContext.uc_link = NULL;
-    // makecontext(&exitContext, exitFunc, 0);
+#endif
 }
 
 thread_t thread_self() {
@@ -138,29 +144,31 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
     newThread->func = func;
     newThread->arg = arg;
-    
 
+#ifdef USE_CONTEXT
+    if (getcontext(&newThread->context) == -1) {
+        free(newThread->stack);
+        free(newThread);
+        return -1;
+    }
+
+    newThread->context.uc_stack.ss_sp = newThread->stack;
+    newThread->context.uc_stack.ss_size = SizeStack;
+    newThread->context.uc_stack.ss_flags = 0;
+
+    newThread->context.uc_link = NULL;
+
+    makecontext(&newThread->context, (void (*)(void))thread_wrapper, 1, newThread);
+#else
     setjmp(newThread->env);
-    // if (getcontext(&newThread->context) == -1) {
-    //     free(newThread->stack);
-    //     free(newThread);
-    //     return -1;
-    // }
+
     unsigned long sp = (unsigned long)newThread->stack + SizeStack - 16;
     unsigned long pc = (unsigned long)thread_wrapper;
 
-
     newThread->env[0].__jmpbuf[JB_RSP] = mangle((long int)sp);
     newThread->env[0].__jmpbuf[JB_PC]  = mangle((long int)pc);
+#endif
 
-
-    // newThread->context.uc_stack.ss_sp = newThread->stack;
-    // newThread->context.uc_stack.ss_size = SizeStack;
-    // newThread->context.uc_stack.ss_flags = 0;
-
-    // newThread->context.uc_link = NULL;
-
-    // makecontext(&newThread->context, (void (*)(void))thread_wrapper, 1, newThread);
     *createdThread = (thread_t)newThread;
 
     TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
@@ -183,10 +191,13 @@ int thread_yield(){
     nextThread->state = RUNNING;
 
     currentThread = nextThread;
-    // swapcontext(&oldThread->context, &nextThread->context);
+#ifdef USE_CONTEXT
+    swapcontext(&oldThread->context, &nextThread->context);
+#else
     if (setjmp(oldThread->env) == 0) {
         longjmp(nextThread->env, 1);
     }
+#endif
     return 0;
 }
 
@@ -245,9 +256,12 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
 
     if (TAILQ_EMPTY(&readyQueue)) {
         VALGRIND_STACK_DEREGISTER(currentThread->valgrind_stackid);
+#ifdef USE_CONTEXT
+        setcontext(&exitContext);
+#else
         longjmp(exitEnv, 1);
-        // setcontext(&exitContext);
-        assert(0); // i ldoit quitter avec le exitcontext
+#endif
+        assert(0);
     }
 
     thread_s *nextThread = TAILQ_FIRST(&readyQueue);
@@ -256,8 +270,11 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     nextThread->state = RUNNING;
     currentThread = nextThread;
 
+#ifdef USE_CONTEXT
+    setcontext(&nextThread->context);
+#else
     longjmp(nextThread->env, 1);
-    // setcontext(&nextThread->context);
+#endif
     assert(0);
 }
 

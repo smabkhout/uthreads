@@ -32,7 +32,7 @@ static void * thfunc(void *_nbth)
         assert(!err);
 
         for(i=0; i<(nbyield*nbth); i++) {
-            printf("je suis le th %p \n" ,thread_self());
+            // printf("je suis le th %p \n" ,thread_self());
             thread_yield();
         }
 
@@ -43,7 +43,7 @@ static void * thfunc(void *_nbth)
     }
     else {
         for(i=0; i<(nbyield*nbthread); i++) {
-            printf("je suis le th %p dasn else \n" ,thread_self());
+            // printf("je suis le th %p dasn else \n" ,thread_self());
 
             thread_yield();
         }
