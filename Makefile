@@ -37,7 +37,9 @@ valgrind: build_tests
 		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test || true; \
 	done
 
-graph: #graph generation?
+graphs: install
+	mkdir -p results
+	python3 scripts/plot.py
 
 install: build_tests pthreads
 
