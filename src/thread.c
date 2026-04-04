@@ -1,6 +1,7 @@
 #include "thread.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <setjmp.h>
 #include <ucontext.h>
 #include <sys/queue.h>
 #include <assert.h>
@@ -8,6 +9,9 @@
 
 #include <valgrind/valgrind.h>
 
+//registre pour stackpointer et program counter
+#define JB_RSP 6
+#define JB_PC  7
 
 #define SizeStack	8192
 
@@ -19,7 +23,8 @@ enum threadState {
 };
 
 struct thread_s {
-    ucontext_t context;
+    //ucontext_t context;
+    jmp_buf env;
     void *stack;
     int valgrind_stackid; //pour valgrind
     enum threadState state;
@@ -45,10 +50,12 @@ int init_done = 0;
 
 static thread_s mainThread;
 
-// pour que si un thread autre aue main finit l'execution en dernier il peut free son stack son probleme 
-static char exitStack[8192];
-// il faut lui donner ce contexte avec cette stack avant de free so stack "dynamique"
-static ucontext_t exitContext;
+// // pour que si un thread autre aue main finit l'execution en dernier il peut free son stack son probleme 
+// static char exitStack[8192];
+// // il faut lui donner ce contexte avec cette stack avant de free so stack "dynamique"
+// static ucontext_t exitContext;
+
+static jmp_buf exitEnv;
 
 
 static void exitFunc() {
@@ -59,6 +66,15 @@ static void exitFunc() {
     exit(0);
 }
 
+// longjmp effectue un demangle donc il faut lui doner l'addresse brouille pas en clair
+static inline long int mangle(long int p) {
+    long int ret;
+    asm ("xor %%fs:0x30, %0\n"
+         "rol $0x11, %0\n"
+         : "=r" (ret)
+         : "0" (p));
+    return ret;
+}
 //the main function should be the first thread created
 void thread_init() {
     if (init_done) return;
@@ -72,17 +88,23 @@ void thread_init() {
     currentThread->joiningThread = NULL;
     currentThread->stack = NULL; // pile principale
 
-    if (getcontext(&currentThread->context) == -1) {
-        perror("Erreur lors du getcontext du main");
-        exit(EXIT_FAILURE);
+    // if (getcontext(&currentThread->context) == -1) {
+    //     perror("Erreur lors du getcontext du main");
+    //     exit(EXIT_FAILURE);
+    // }
+
+
+    // enregistre le contexte actuel
+    if (setjmp(exitEnv) != 0) {
+        exitFunc();
     }
 
-    // contexte de sortie
-    getcontext(&exitContext);
-    exitContext.uc_stack.ss_sp = exitStack;
-    exitContext.uc_stack.ss_size = 8192;
-    exitContext.uc_link = NULL;
-    makecontext(&exitContext, exitFunc, 0);
+    // // contexte de sortie
+    // getcontext(&exitContext);
+    // exitContext.uc_stack.ss_sp = exitStack;
+    // exitContext.uc_stack.ss_size = 8192;
+    // exitContext.uc_link = NULL;
+    // makecontext(&exitContext, exitFunc, 0);
 }
 
 thread_t thread_self() {
@@ -107,32 +129,38 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
         free(newThread);
         return -1;
     }
-    
 
-    if (getcontext(&newThread->context) == -1) {
-        free(newThread->stack);
-        free(newThread);
-        return -1;
-    }
-
-    newThread->context.uc_stack.ss_sp = newThread->stack;
-    newThread->context.uc_stack.ss_size = SizeStack;
-    newThread->context.uc_stack.ss_flags = 0;
-
-    
-    newThread->context.uc_link = NULL; 
-
-    newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->context.uc_stack.ss_sp,
-                                               newThread->context.uc_stack.ss_sp + newThread->context.uc_stack.ss_size);
+    newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
+                                               newThread->stack + SizeStack);
 
     newThread->state = READY;
     newThread->joiningThread = NULL;
 
     newThread->func = func;
     newThread->arg = arg;
+    
 
-    // We MUST use the wrapper to intercept the return value!
-    makecontext(&newThread->context, (void (*)(void))thread_wrapper, 1, newThread);
+    setjmp(newThread->env);
+    // if (getcontext(&newThread->context) == -1) {
+    //     free(newThread->stack);
+    //     free(newThread);
+    //     return -1;
+    // }
+    unsigned long sp = (unsigned long)newThread->stack + SizeStack - 16;
+    unsigned long pc = (unsigned long)thread_wrapper;
+
+
+    newThread->env[0].__jmpbuf[JB_RSP] = mangle((long int)sp);
+    newThread->env[0].__jmpbuf[JB_PC]  = mangle((long int)pc);
+
+
+    // newThread->context.uc_stack.ss_sp = newThread->stack;
+    // newThread->context.uc_stack.ss_size = SizeStack;
+    // newThread->context.uc_stack.ss_flags = 0;
+
+    // newThread->context.uc_link = NULL;
+
+    // makecontext(&newThread->context, (void (*)(void))thread_wrapper, 1, newThread);
     *createdThread = (thread_t)newThread;
 
     TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
@@ -155,7 +183,10 @@ int thread_yield(){
     nextThread->state = RUNNING;
 
     currentThread = nextThread;
-    swapcontext(&oldThread->context, &nextThread->context);
+    // swapcontext(&oldThread->context, &nextThread->context);
+    if (setjmp(oldThread->env) == 0) {
+        longjmp(nextThread->env, 1);
+    }
     return 0;
 }
 
@@ -214,7 +245,8 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
 
     if (TAILQ_EMPTY(&readyQueue)) {
         VALGRIND_STACK_DEREGISTER(currentThread->valgrind_stackid);
-        setcontext(&exitContext);
+        longjmp(exitEnv, 1);
+        // setcontext(&exitContext);
         assert(0); // i ldoit quitter avec le exitcontext
     }
 
@@ -224,7 +256,8 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     nextThread->state = RUNNING;
     currentThread = nextThread;
 
-    setcontext(&nextThread->context);
+    longjmp(nextThread->env, 1);
+    // setcontext(&nextThread->context);
     assert(0);
 }
 
