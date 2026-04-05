@@ -7,23 +7,23 @@ BIN_DIR = "./install/bin"
 
 # tests à exécuter
 TESTS = [
-    "01-main",
-    "02-switch",
-    "03-equity",
-    "11-join",
-    "12-join-main",
-    "13-join-switch",
+    # "01-main",
+    # "02-switch",
+    # "03-equity",
+    # "11-join",
+    # "12-join-main",
+    # "13-join-switch",
     "21-create-many",
     "22-create-many-recursive",
     "23-create-many-once",
-    "31-switch-many",
-    "32-switch-many-join",
-    "33-switch-many-cascade",
+    # "31-switch-many",
+    # "32-switch-many-join",
+    # "33-switch-many-cascade",
     # "51-fibonacci",
     "61-mutex",
-    "62-mutex",
-    "63-mutex-equity",
-    "64-mutex-join",
+    # "62-mutex",
+    # "63-mutex-equity",
+    # "64-mutex-join",
     # "71-preemption",
     # "81-deadlock",
     # "example",
@@ -38,23 +38,28 @@ RUNS = 3
 
 def run_test(binary, n):
     try:
-        start = time.perf_counter()
-
-        subprocess.run(
+        result = subprocess.run(
             [binary, str(n)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            capture_output=True,
+            text=True
         )
 
-        end = time.perf_counter()
+        output = result.stdout + result.stderr
 
-        return end - start
+        for line in output.splitlines():
+            if line.startswith("GRAPH;"):
+                parts = line.strip().split(";")
+
+                time_us = int(parts[-1])
+
+                return time_us / 1_000_000  # µs → secondes
+
+        print(f"[ERROR] Pas de ligne GRAPH dans {binary} ({n})")
 
     except Exception as e:
         print(f"Erreur avec {binary} ({n}) :", e)
 
     return None
-
 
 def average_time(binary, n):
     times = []
