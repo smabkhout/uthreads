@@ -1,11 +1,14 @@
 #include "thread.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <setjmp.h>
 #include <ucontext.h>
 #include <sys/queue.h>
 #include <assert.h>
 #include <errno.h>
+#include <signal.h>
+#include <sys/mman.h>
 
 #include <valgrind/valgrind.h>
 
@@ -14,6 +17,7 @@
 #define JB_PC  7
 
 #define SizeStack	8192
+#define PageSize 4096
 
 enum threadState {
     READY,
@@ -131,10 +135,22 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     if (newThread == NULL) return -1;
 
     newThread->stack = malloc(SizeStack); 
+    // if (posix_memalign(&newThread->stack, PageSize, SizeStack) != 0) {
+    //     perror("posix_memalign");
+    //     free(newThread);
+    //     return -1;
+    // }
+
     if (newThread->stack == NULL) {
         free(newThread);
         return -1;
     }
+    //detection debordement de pile avec mprotect
+    // if (mprotect(newThread->stack, PageSize, PROT_NONE)!=0){
+    //     perror("mprotect");
+    // }
+
+
 
     newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
                                                newThread->stack + SizeStack);

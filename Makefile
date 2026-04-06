@@ -55,7 +55,11 @@ graphs: install
 
 install: build_tests pthreads context
 
+rapport:
+	pdflatex rapport/rapport.tex
+
 clean:
 	rm -f install/bin/* install/lib/* *.o
+	rm -f *.aux *.log *.pdf *.toc
 
-.PHONY: clean graph check valgrind install build_tests pthreads context all
+.PHONY: all clean graphs check valgrind install build_tests pthreads context all rapport

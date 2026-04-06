@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   } else {
     printf("fibo(%lu) = %lu en %e s\n", value, res, s );
-    printf("GRAPH;%lu;%lu;%e;%s\n", value, res, s, "SUCCESS" );
+    //printf("GRAPH;%lu;%lu;%e;%s\n", value, res, s, "SUCCESS" );
     return EXIT_SUCCESS;
   }
 }
