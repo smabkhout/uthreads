@@ -1,21 +1,27 @@
 \section{Gestion des contextes : Transition de \texttt{ucontext} vers \texttt{setjmp/longjmp}}
 
-Afin d'optimiser notre bibliothèque et de diminuer le temps d'exécution, nous avons remplacé l'utilisation de \texttt{ucontext.h} par le mécanisme plus léger de \texttt{setjmp/longjmp}. Ce choix permet une gestion manuelle du contexte d'exécution, ce qui se traduit par de meilleures performances.
+Afin d'optimiser notre bibliothèque et de réduire le temps d'exécution, nous avons remplacé l'utilisation de \texttt{ucontext.h} par le mécanisme plus léger basé sur \texttt{setjmp/longjmp}. Ce choix permet une gestion plus fine et plus efficace du contexte d'exécution, au prix d'une portabilité réduite.
 
 \subsection{Détails de l'implémentation}
 
 Le passage à cette méthode a nécessité plusieurs adaptations structurelles dans le code :
 \begin{itemize}
-    \item \textbf{Changement dans la structure \texttt{thread\_s} :} Le champ \texttt{ucontext\_t}, a été remplacé par un \texttt{jmp\_buf env}. Ce tampon stocke l'état minimal des registres (pile, compteur de programme) nécessaire à la reprise d'un thread.
-    \item \textbf{Le "Mangling" :} Contrairement à \texttt{makecontext}, \texttt{setjmp} ne permet pas de définir nativement une nouvelle pile. Nous avons implémenté une fonction \texttt{mangle} en assembleur \textit{inline} pour chiffrer les adresses de la pile (\texttt{JB\_RSP}) et du point d'entrée (\texttt{JB\_PC}). Cette étape est indispensable pour contourner la protection des pointeurs de la \texttt{glibc} sur l'architecture x86\_64.
-    \item \textbf{Thread\_yield :} La fonction \texttt{thread\_yield} utilise désormais l'instruction suivante : \texttt{if (setjmp(old->env) == 0) longjmp(next->env, 1)}. Cela permet de sauvegarder le contexte courant avant de restaurer celui du thread suivant.
+    \item \textbf{Changement dans la structure \texttt{thread\_s} :} Le champ \texttt{ucontext\_t} a été remplacé par un \texttt{jmp\_buf env}. Ce tampon stocke une partie de l'état d'exécution, incluant notamment le compteur ordinal (PC), le pointeur de pile (SP) ainsi que certains registres. Contrairement à \texttt{ucontext}, il ne sauvegarde pas l'intégralité de l'état processeur ni le masque de signaux.
+    \item \textbf{Initialisation manuelle du contexte :} Contrairement à \texttt{makecontext}, \texttt{setjmp} ne permet pas d'initialiser directement une nouvelle pile ni un point d'entrée. Nous avons donc modifié manuellement le contenu du \texttt{jmp\_buf} pour définir le pointeur de pile (\texttt{RSP}) et le compteur de programmme (\texttt{PC}).
+    \item \textbf{Mangling des pointeurs :} L'implémentation de la \texttt{glibc} applique un mécanisme de protection des pointeurs (\textit{pointer mangling}) sur les adresses stockées dans \texttt{jmp\_buf}. Ainsi, lors d'un \texttt{longjmp}, les valeurs sont automatiquement démanglées. Pour garantir un comportement correct, nous devons donc fournir des adresses préalablement "manglées". Cette opération est réalisée via une fonction en assembleur inline reproduisant la transformation utilisée par la \texttt{glibc}. Cette approche dépend fortement de l'implémentation interne de la bibliothèque et de l'architecture (ici x86\_64), ce qui réduit la portabilité du code.
+    \item \textbf{Thread\_yield :} La fonction \texttt{thread\_yield} repose désormais sur le schéma suivant :
+    \begin{center}
+        \texttt{if (setjmp(old->env) == 0) longjmp(next->env, 1);}
+    \end{center}
+    Cela permet de sauvegarder le contexte courant avant de restaurer celui du thread suivant.
 \end{itemize}
 
 \subsection{Intérêt de l'approche}
 
-Ce changement d'implémentation apporte des avantages critiques pour les performances de la bibliothèque :
+Ce changement d'implémentation apporte plusieurs avantages :
+
 \begin{itemize}
-    \item \textbf{Performance et légèreté :} L'appel \texttt{swapcontext} est coûteux car il sauvegarde et restaure systématiquement le masque de signaux du processus. À l'inverse, \texttt{setjmp} et \texttt{longjmp} sont des fonctions de la bibliothèque C qui ne manipulent que les registres, réduisant considérablement le coût du changement de contexte.
-    \item \textbf{Alignement et contrôle  :} Cette approche permet un contrôle total sur l'alignement de la pile (fixé à -16 octets dans notre implémentation). Cet alignement est crucial pour respecter l'ABI x86\_64 et éviter des fautes de segmentation lors de l'utilisation d'instructions vectorielles (SSE/AVX) par les fonctions utilisateurs.
+    \item \textbf{Performance et légèreté :} Contrairement à \texttt{swapcontext}, qui sauvegarde et restaure un contexte complet (incluant notamment le masque de signaux et davantage de registres), \texttt{setjmp/longjmp} manipule un sous-ensemble plus restreint de l'état processeur. Cela réduit significativement le coût des changements de contexte.
+    \item \textbf{Contrôle fin :} Cette approche permet un contrôle explicite du pointeur de pile et de son alignement (ici aligné sur 16 octets). Cet alignement est nécessaire pour garantir le bon fonctionnement du programme et éviter certains problèmes lors de l'exécution.
+    \item \textbf{Compromis :} En contrepartie, cette solution repose sur des détails internes de la \texttt{glibc} et de l'architecture cible, ce qui la rend non portable et plus fragile face à des changements d'implémentation.
 \end{itemize}
- 

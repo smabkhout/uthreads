@@ -8,10 +8,11 @@ Tous les tests fournis passent à l'exception du test 71 (préemption, non impl�
 \subsubsection*{Structure Fondamentale}
 La structure \texttt{thread\_s} centralise toutes les informations :
 \begin{itemize}
-    \item Contexte d'exécution: (\texttt{ucontext\_t} + \texttt{jmp\_buf})
+    \item Contexte d'exécution: (\texttt{ucontext\_t} OU \texttt{jmp\_buf})
     \item Pile associée au thread (8 Ko)
     \item État (\texttt{READY/RUNNING/BLOCKED/TERMINATED})
-    \item Valeur de retour et thread en attente (\texttt{joiningThread})
+    \item Valeur de retour (\texttt{void* retval})
+    \item Thread en attente (\texttt{joiningThread})
     \item Liaison TAILQ pour ordonnancement
 \end{itemize}
 Nous avons retenu les \textit{TAILQ} de la bibliothéque \textit{OpenBSD} car ils permettent un ordonnancement FIFO efficace et de supprimer n'importe quel thread en $O(1)$, ce qui nous évitera des parcours linéaires qui vont affecter les performances.
@@ -30,7 +31,7 @@ La cible \texttt{make graphs} est en cours d'implémentation.
 \subsection{Mutex}
 Nous avons opté pour une implémentation simple mais efficace pour les mutex:
 \begin{itemize}
-    \item Structure : un entier (1 ou 0) + file d'attente TAILQ qui contient l'ensemble des threads qui attendent le déverouillage du mutex.
+    \item Structure : un entier (1 ou 0) + file d'attente TAILQ qui contient l'ensemble des threads qui attendent le déverouillage de ce mutex.
     \item Fonctions : \texttt{init()}, \texttt{destroy()}, \texttt{lock()}, \texttt{unlock()}
 \end{itemize}
 
@@ -39,6 +40,6 @@ Nous avons opté pour une implémentation simple mais efficace pour les mutex:
 \begin{itemize}
     \item \texttt{readyQueue} (TAILQ) : threads prêts à s'exécuter (FIFO)
     \item \texttt{blockedQueue} (TAILQ) : threads en attente (\texttt{join})
-    \item \texttt{currentThread} : varaible global pointant vers le thread courant
+    \item \texttt{currentThread} : variable global pointant vers le thread courant
 \end{itemize}
 
