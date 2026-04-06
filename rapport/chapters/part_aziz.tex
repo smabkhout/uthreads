@@ -2,7 +2,7 @@
 
 Afin d’évaluer notre bibliothèque de threads en espace utilisateur, nous l’avons comparée aux pthreads à l’aide du test 61-mutex, qui consiste à incrémenter un compteur partagé protégé par un mutex. Chaque thread effectue 1000 incrémentations, avec des appels à \texttt{thread\_yield()} à l’intérieur de la section critique, ce qui force de nombreux changements de contexte et accentue la contention sur le verrou.\\
 
-Avant de présenter les résultats, il est important de préciser les conditions expérimentales. Les tests ont été réalisés sur une machine disposant de 4 cœurs physiques. Or, les pthreads peuvent exploiter le parallélisme matériel, contrairement à notre implémentation qui repose sur un seul thread noyau. Afin de garantir une comparaison équitable, nous avons donc limité l’exécution des programmes à un seul cœur à l’aide de la commande \texttt{taskset}. Ainsi, le graphe ci-dessous montre les performances en fonction du nombre de threads.
+\noindent Avant de présenter les résultats, il est important de préciser les conditions expérimentales. Les tests ont été réalisés sur une machine disposant de 4 cœurs physiques. Or, les pthreads peuvent exploiter le parallélisme matériel, contrairement à notre implémentation qui repose sur un seul thread noyau. Afin de garantir une comparaison équitable, nous avons donc limité l’exécution des programmes à un seul cœur à l’aide de la commande \texttt{taskset}. Ainsi, le graphe ci-dessous montre les performances en fonction du nombre de threads.
 
 \begin{figure}[h]
 	\centering

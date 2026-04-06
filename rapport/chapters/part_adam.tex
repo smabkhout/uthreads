@@ -4,7 +4,7 @@ Afin d'optimiser notre bibliothèque et de réduire le temps d'exécution, nous 
 
 \subsection{Détails de l'implémentation}
 
-Le passage à cette méthode a nécessité plusieurs adaptations structurelles dans le code :
+Le passage à cette méthode a nécessité plusieurs adaptations structurelles dans le code :\\
 \begin{itemize}
     \item \textbf{Changement dans la structure \texttt{thread\_s} :} Le champ \texttt{ucontext\_t} a été remplacé par un \texttt{jmp\_buf env}. Ce tampon stocke une partie de l'état d'exécution, incluant notamment le compteur ordinal (PC), le pointeur de pile (SP) ainsi que certains registres. Contrairement à \texttt{ucontext}, il ne sauvegarde pas l'intégralité de l'état processeur ni le masque de signaux.
     \item \textbf{Initialisation manuelle du contexte :} Contrairement à \texttt{makecontext}, \texttt{setjmp} ne permet pas d'initialiser directement une nouvelle pile ni un point d'entrée. Nous avons donc modifié manuellement le contenu du \texttt{jmp\_buf} pour définir le pointeur de pile (\texttt{RSP}) et le compteur de programmme (\texttt{PC}).
@@ -18,7 +18,7 @@ Le passage à cette méthode a nécessité plusieurs adaptations structurelles d
 
 \subsection{Intérêt de l'approche}
 
-Ce changement d'implémentation apporte plusieurs avantages :
+Ce changement d'implémentation apporte plusieurs avantages :\\
 
 \begin{itemize}
     \item \textbf{Performance et légèreté :} Contrairement à \texttt{swapcontext}, qui sauvegarde et restaure un contexte complet (incluant notamment le masque de signaux et davantage de registres), \texttt{setjmp/longjmp} manipule un sous-ensemble plus restreint de l'état processeur. Cela réduit significativement le coût des changements de contexte.
