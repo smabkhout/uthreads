@@ -13,7 +13,7 @@ La structure \texttt{thread\_s} centralise toutes les informations :
     \item État (\texttt{READY/RUNNING/BLOCKED/TERMINATED})
     \item Valeur de retour (\texttt{void* retval})
     \item Thread en attente (\texttt{joiningThread})
-    \item Liaison TAILQ pour ordonnancement
+    \item Liaison (\texttt{TAILQ\_ENTRY}) pour ordonnancement
 \end{itemize}
 Nous avons retenu les \textit{TAILQ} de la bibliothéque \textit{OpenBSD} car ils permettent un ordonnancement FIFO efficace et de supprimer n'importe quel thread en $O(1)$, ce qui nous évitera des parcours linéaires qui vont affecter les performances.
 
@@ -31,15 +31,15 @@ Le \texttt{Makefile} supporte les cibles suivantes :
 \subsection{Mutex}
 Nous avons opté pour une implémentation simple mais efficace pour les mutex:
 \begin{itemize}
-    \item Structure : un entier (1 ou 0) + file d'attente TAILQ qui contient l'ensemble des threads qui attendent le déverouillage de ce mutex.
+    \item Structure : un entier (1 ou 0) + file d'attente \texttt{TAILQ} qui contient l'ensemble des threads qui attendent le déverouillage de ce mutex.
     \item Fonctions : \texttt{init()}, \texttt{destroy()}, \texttt{lock()}, \texttt{unlock()}
 \end{itemize}
 
 
 \subsection{Ordonnancement Coopératif}
 \begin{itemize}
-    \item \texttt{readyQueue} (TAILQ) : threads prêts à s'exécuter (FIFO)
-    \item \texttt{blockedQueue} (TAILQ) : threads en attente (\texttt{join})
+    \item \texttt{readyQueue} (\texttt{TAILQ}) : threads prêts à s'exécuter (FIFO)
+    \item \texttt{blockedQueue} (\texttt{TAILQ}) : threads en attente (\texttt{join})
     \item \texttt{currentThread} : variable global pointant vers le thread courant
 \end{itemize}
 
