@@ -1,2 +1,19 @@
-\section{} 
-\label{}
+\section{Gestion des contextes : Transition de \texttt{ucontext} vers \texttt{setjmp/longjmp}}
+
+Afin d'optimiser notre bibliothèque et de diminuer le temps d'exécution, nous avons remplacé l'utilisation de \texttt{ucontext.h} par le mécanisme plus léger de \texttt{setjmp/longjmp}. Ce choix permet une gestion manuelle du contexte d'exécution, ce qui se traduit par de meilleures performances.
+
+\subsection{Détails de l'implémentation}
+
+Le passage à cette méthode a nécessité plusieurs adaptations structurelles dans le code :
+\begin{itemize}
+    \item \textbf{Changement dans la structure \texttt{thread\_s} :} Le champ \texttt{ucontext\_t}, a été remplacé par un \texttt{jmp\_buf env}. Ce tampon stocke l'état minimal des registres (pile, compteur de programme) nécessaire à la reprise d'un thread.
+    \item \textbf{Le "Mangling" :} Contrairement à \texttt{makecontext}, \texttt{setjmp} ne permet pas de définir nativement une nouvelle pile. Nous avons implémenté une fonction \texttt{mangle} en assembleur \textit{inline} pour chiffrer les adresses de la pile (\texttt{JB\_RSP}) et du point d'entrée (\texttt{JB\_PC}). Cette étape est indispensable pour contourner la protection des pointeurs de la \texttt{glibc} sur l'architecture x86\_64.
+    \item \textbf{Thread\_yield :} La fonction \texttt{thread\_yield} utilise désormais l'instruction suivante : \texttt{if (setjmp(old->env) == 0) longjmp(next->env, 1)}. Cela permet de sauvegarder le contexte courant avant de restaurer celui du thread suivant.
+
+\subsection{Intérêt de l'approche}
+
+Ce changement d'implémentation apporte des avantages critiques pour les performances de la bibliothèque :
+\begin{itemize}
+    \item \textbf{Performance et légèreté :} L'appel \texttt{swapcontext} est coûteux car il sauvegarde et restaure systématiquement le masque de signaux du processus. À l'inverse, \texttt{setjmp} et \texttt{longjmp} sont des fonctions de la bibliothèque C qui ne manipulent que les registres, réduisant considérablement le coût du changement de contexte.
+    \item \textbf{Alignement et contrôle  :} Cette approche permet un contrôle total sur l'alignement de la pile (fixé à -16 octets dans notre implémentation). Cet alignement est crucial pour respecter l'ABI x86\_64 et éviter des fautes de segmentation lors de l'utilisation d'instructions vectorielles (SSE/AVX) par les fonctions utilisateurs.
+ 
