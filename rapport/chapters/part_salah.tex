@@ -1,2 +1,29 @@
-\section{} 
-\label{}
+\section{Objectifs du projet et perspectives}
+
+À ce stade du projet, les fonctionnalités principales attendues ont été implémentées et sont opérationnelles :
+\begin{itemize}
+    \item Création et gestion de threads
+    \item Ordonnancement coopératif de type FIFO
+    \item Changement de contexte entre threads
+    \item Synchronisation avec \texttt{thread\_join}
+\end{itemize}
+
+Les programmes de tests fournis s’exécutent correctement et produisent des résultats cohérents. Les performances obtenues sont satisfaisantes, ce qui valide globalement les choix d’implémentation réalisés.
+
+\vspace{0.5cm}
+
+Pour la suite du projet, si le temps le permet, nous souhaitons implémenter plusieurs objectifs avancés afin d’enrichir la bibliothèque et d’en étudier l’impact sur les performances. Nous prévoyons de les aborder dans l’ordre suivant :
+
+\begin{itemize}
+    \item \textbf{Préemption :} ajouter un mécanisme permettant d’interrompre automatiquement un thread en cours d’exécution afin d’améliorer l’équité de l’ordonnancement.
+
+    \item \textbf{Gestion des signaux :} intégrer la gestion des signaux afin de déclencher des interruptions (par exemple via des timers) et supporter efficacement la préemption.
+
+    \item \textbf{Détection des débordements de pile :} détecter les dépassements de pile pour améliorer la robustesse et éviter des comportements indéfinis.
+
+    \item \textbf{Tests de performances :} concevoir au moins deux tests propres à notre implémentation, permettant d’évaluer des aspects complémentaires à ceux déjà couverts par les tests existants.
+
+    \item \textbf{Support des machines multicoeurs :} exploiter plusieurs coeurs pour exécuter les threads en parallèle et étudier l’impact sur les performances.
+\end{itemize}
+
+Ces objectifs dépendront du temps restant ainsi que de la stabilité de l’implémentation actuelle.
