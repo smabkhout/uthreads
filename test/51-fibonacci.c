@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 
   if (res != fibo_checker(value)) {
     printf("fibo(%lu) != %lu (FAILED)\n", value, fibo_checker(value));
-    printf("GRAPH;%lu;%lu;%e;%s\n", value, res, s, "FAILED" );
+    //printf("GRAPH;%lu;%lu;%e;%s\n", value, res, s, "FAILED" );
     return EXIT_FAILURE;
   } else {
     printf("fibo(%lu) = %lu en %e s\n", value, res, s );
