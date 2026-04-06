@@ -4,6 +4,7 @@ import time
 import matplotlib.pyplot as plt
 
 BIN_DIR = "./install/bin"
+TASKSET_CMD = ["taskset", "-c", "0"]
 
 # tests à exécuter
 TESTS = [
@@ -39,7 +40,7 @@ RUNS = 3
 def run_test(binary, n):
     try:
         result = subprocess.run(
-            [binary, str(n)],
+            TASKSET_CMD + [binary, str(n)],
             capture_output=True,
             text=True
         )
@@ -82,32 +83,42 @@ def main():
 
         print(f"\n=== Test: {test} ===")
 
-        user_bin = os.path.join(BIN_DIR, test)
+        setjmp_bin = os.path.join(BIN_DIR, test)
+        context_bin = os.path.join(BIN_DIR, test + "-context")
         pthread_bin = os.path.join(BIN_DIR, test + "-pthread")
 
-        if not os.path.exists(user_bin) or not os.path.exists(pthread_bin):
+
+        if not os.path.exists(setjmp_bin) or not os.path.exists(pthread_bin) or not os.path.exists(context_bin):
             print(f"[SKIP] {test} non trouvé")
             continue
 
-        user_times = []
+        setjmp_times = []
+        context_times = []
         pthread_times = []
+        
 
         for n in THREADS:
             print(f"Threads: {n}")
 
-            t1 = average_time(user_bin, n)
-            t2 = average_time(pthread_bin, n)
+            t1 = average_time(setjmp_bin, n)
+            t3 = average_time(context_bin, n)
+            t2 = average_time(pthread_bin, n)   
+            
+    
+            print(f"  setjmp/longjmp avg: {t1}")
+            print(f"  ucontext avg: {t3}")
+            print(f"  Pthreads avg: {t2}")
 
-            print(f"  user avg: {t1}")
-            print(f"  pthread avg: {t2}")
-
-            user_times.append(t1)
+            setjmp_times.append(t1)
+            context_times.append(t3)
             pthread_times.append(t2)
+            
 
         # graphe
         plt.figure()
 
-        plt.plot(THREADS, user_times, marker='o', label="User Threads")
+        plt.plot(THREADS, setjmp_times, marker='o', label="setjmp/longjmp")
+        plt.plot(THREADS, context_times, marker='o', label="ucontext")
         plt.plot(THREADS, pthread_times, marker='o', label="Pthreads")
 
         plt.xlabel("Number of threads")
