@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "thread.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +9,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/time.h>
 #include <sys/mman.h>
 
 #include <valgrind/valgrind.h>
@@ -16,7 +18,11 @@
 #define JB_RSP 6
 #define JB_PC  7
 
-#define SizeStack	8192
+#ifdef USE_PREEM
+    #define SizeStack	8192*2
+#else
+    #define SizeStack	8192
+#endif
 #define PageSize 4096
 
 enum threadState {
@@ -30,7 +36,12 @@ struct thread_s {
 #ifdef USE_CONTEXT
     ucontext_t context;
 #else
-    jmp_buf env;
+    #ifdef USE_PREEM
+        sigjmp_buf env;
+    #else
+        jmp_buf env;
+    #endif
+
 #endif
     void *stack;
     int valgrind_stackid; //pour valgrind
@@ -63,9 +74,15 @@ static char exitStack[8192];
 // il faut lui donner ce contexte avec cette stack avant de free so stack "dynamique"
 static ucontext_t exitContext;
 #else
-static jmp_buf exitEnv;
+
+
+#ifdef USE_PREEM
+    static sigjmp_buf exitEnv;
+#else
+    static jmp_buf exitEnv;
 #endif
 
+#endif
 
 static void exitFunc() {
     if (currentThread != &mainThread) {
@@ -74,6 +91,43 @@ static void exitFunc() {
     }
     exit(0);
 }
+
+static void lock_preemption() {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGVTALRM);
+    sigprocmask(SIG_BLOCK, &set, NULL);
+}
+
+static void unlock_preemption() {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGVTALRM);
+    sigprocmask(SIG_UNBLOCK, &set, NULL);
+}
+
+
+static void alarm_handler(int sig) {
+    (void)sig;
+    thread_yield();
+}
+
+void start_preemption() {
+    struct sigaction sa;
+    struct itimerval it;
+
+    sa.sa_handler = alarm_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART; 
+    sigaction(SIGVTALRM, &sa, NULL);
+
+    it.it_interval.tv_sec = 0;
+    it.it_interval.tv_usec = 10000; 
+    it.it_value = it.it_interval;
+
+    setitimer(ITIMER_VIRTUAL, &it, NULL);
+}
+
 
 // longjmp effectue un demangle donc il faut lui doner l'addresse brouille pas en clair
 static inline long int mangle(long int p) {
@@ -110,10 +164,24 @@ void thread_init() {
     exitContext.uc_link = NULL;
     makecontext(&exitContext, exitFunc, 0);
 #else
+
+
+#ifdef USE_PREEM
+    /* enregistre le contexte actuel */
+    if (sigsetjmp(exitEnv, 1) != 0) {
+        exitFunc();
+    }
+#else
     /* enregistre le contexte actuel */
     if (setjmp(exitEnv) != 0) {
         exitFunc();
     }
+#endif
+
+#endif
+
+#ifdef USE_PREEM
+    start_preemption();
 #endif
 }
 
@@ -122,12 +190,16 @@ thread_t thread_self() {
     return (thread_t) currentThread;
 }
 
-static void thread_wrapper(thread_s *thread) {
+static void thread_wrapper(void) { 
+    thread_s *thread = currentThread; 
     void *retval = thread->func(thread->arg);
     thread_exit(retval);
 }
 
 int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     if (currentThread == NULL) {
         thread_init();
     }
@@ -176,7 +248,13 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
     makecontext(&newThread->context, (void (*)(void))thread_wrapper, 1, newThread);
 #else
-    setjmp(newThread->env);
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
+    sigsetjmp(newThread->env, 1);
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
 
     unsigned long sp = (unsigned long)newThread->stack + SizeStack - 16;
     unsigned long pc = (unsigned long)thread_wrapper;
@@ -188,10 +266,16 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     *createdThread = (thread_t)newThread;
 
     TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
     return 0;
 }
 
 int thread_yield(){
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     thread_s *oldThread = currentThread;
     //cas si il y a personne d'autre
     if (init_done == 0 || TAILQ_EMPTY(&readyQueue)) {
@@ -210,14 +294,20 @@ int thread_yield(){
 #ifdef USE_CONTEXT
     swapcontext(&oldThread->context, &nextThread->context);
 #else
-    if (setjmp(oldThread->env) == 0) {
-        longjmp(nextThread->env, 1);
+    if (sigsetjmp(oldThread->env, 1) == 0) {
+        siglongjmp(nextThread->env, 1);
     }
 #endif
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
     return 0;
 }
 
 int thread_join(thread_t thread, void **retval){
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     thread_s* oldCurrentThread = currentThread;
     thread_s* targetThread = (thread_s *)thread;
 
@@ -254,12 +344,18 @@ int thread_join(thread_t thread, void **retval){
         if (targetThread->stack) free(targetThread->stack);
         free(targetThread);
     }
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
 
     return 0;
 }
 
 // on specifie à gcc que la fct ne retourne pas pour eviter les warnings
 __attribute__((noreturn)) void thread_exit(void *retval) {
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     currentThread->retval = retval;
     currentThread->state = TERMINATED;
 
@@ -275,7 +371,12 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
 #ifdef USE_CONTEXT
         setcontext(&exitContext);
 #else
+
+    #ifdef USE_PREEM
+        siglongjmp(exitEnv, 1);
+    #else
         longjmp(exitEnv, 1);
+    #endif
 #endif
         assert(0);
     }
@@ -289,9 +390,18 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
 #ifdef USE_CONTEXT
     setcontext(&nextThread->context);
 #else
-    longjmp(nextThread->env, 1);
+
+    #ifdef USE_PREEM
+        siglongjmp(nextThread->env, 1);
+    #else
+        longjmp(nextThread->env, 1);
+    #endif
 #endif
     assert(0);
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
+    
 }
 
 
@@ -315,6 +425,9 @@ int thread_mutex_destroy(thread_mutex_t *m)
 int thread_mutex_lock(thread_mutex_t *m)
 {
     if (!m) return -1;
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     while (m->dummy) {
         currentThread->state = BLOCKED;
         TAILQ_INSERT_TAIL((struct mutexQueue*) m->waitingQueue, currentThread, entries);
@@ -325,12 +438,18 @@ int thread_mutex_lock(thread_mutex_t *m)
     //     thread_yield();
     // }
     m->dummy = 1;
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
     return 0;
 }
 
 int thread_mutex_unlock(thread_mutex_t *m)
 {
     if (!m) return -1;
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     m->dummy = 0;
     if (!TAILQ_EMPTY((struct mutexQueue*) m->waitingQueue)) {
         thread_s* myTurnThread = TAILQ_FIRST((struct mutexQueue*) m->waitingQueue);
@@ -339,5 +458,8 @@ int thread_mutex_unlock(thread_mutex_t *m)
         myTurnThread->state = READY;
         TAILQ_INSERT_TAIL(&readyQueue, myTurnThread, entries);        
     }
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     return 0;
 }
