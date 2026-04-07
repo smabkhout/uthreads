@@ -106,7 +106,7 @@ void thread_init() {
     // contexte de sortie
     getcontext(&exitContext);
     exitContext.uc_stack.ss_sp = exitStack;
-    exitContext.uc_stack.ss_size = 8192;
+    exitContext.uc_stack.ss_size = SizeStack;
     exitContext.uc_link = NULL;
     makecontext(&exitContext, exitFunc, 0);
 #else
