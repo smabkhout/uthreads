@@ -91,7 +91,7 @@ static void exitFunc() {
     }
     exit(0);
 }
-
+#ifdef USE_PREEM
 static void lock_preemption() {
     sigset_t set;
     sigemptyset(&set);
@@ -127,6 +127,7 @@ void start_preemption() {
 
     setitimer(ITIMER_VIRTUAL, &it, NULL);
 }
+#endif
 
 
 // longjmp effectue un demangle donc il faut lui doner l'addresse brouille pas en clair
