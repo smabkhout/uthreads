@@ -27,6 +27,10 @@
 
 #define PageSize 4096
 
+
+static volatile int signals_blocked = 0; 
+static volatile int yield_pending = 0; 
+
 enum threadState {
     READY,
     RUNNING,
@@ -94,23 +98,25 @@ static void exitFunc() {
 
 #ifdef USE_PREEM
 static void lock_preemption() {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGVTALRM);
-    sigprocmask(SIG_BLOCK, &set, NULL);
+    signals_blocked++;
 }
 
 static void unlock_preemption() {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGVTALRM);
-    sigprocmask(SIG_UNBLOCK, &set, NULL);
+    signals_blocked--;
+    if (signals_blocked == 0 && yield_pending) {
+        yield_pending = 0;
+        thread_yield();
+    }
 }
 
 
 static void alarm_handler(int sig) {
     (void)sig;
-    thread_yield();
+    if (signals_blocked > 0) {
+        yield_pending = 1;
+    } else {
+        thread_yield();
+    }
 }
 
 void start_preemption() {
@@ -123,7 +129,7 @@ void start_preemption() {
     sigaction(SIGVTALRM, &sa, NULL);
 
     it.it_interval.tv_sec = 0;
-    it.it_interval.tv_usec = 10; 
+    it.it_interval.tv_usec = 10000; 
     it.it_value = it.it_interval;
 
     setitimer(ITIMER_VIRTUAL, &it, NULL);
@@ -188,6 +194,11 @@ thread_t thread_self() {
 }
 
 static void thread_wrapper(thread_s *thread) {
+    #ifdef USE_PREEM
+        // Reset critique pour les nouveaux threads
+        signals_blocked = 0; 
+        yield_pending = 0;
+    #endif
     void *retval = thread->func(thread->arg);
     thread_exit(retval);
 }
