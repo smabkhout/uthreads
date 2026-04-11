@@ -122,8 +122,13 @@ void start_preemption() {
     sa.sa_flags = SA_RESTART; 
     sigaction(SIGVTALRM, &sa, NULL);
 
-    it.it_interval.tv_sec = 0;
-    it.it_interval.tv_usec = 20000; 
+    if (RUNNING_ON_VALGRIND) {
+        it.it_interval.tv_sec = 0;
+        it.it_interval.tv_usec = 1000000; 
+    } else {
+        it.it_interval.tv_sec = 0;
+        it.it_interval.tv_usec = 20000; 
+    }
     it.it_value = it.it_interval;
 
     setitimer(ITIMER_VIRTUAL, &it, NULL);
