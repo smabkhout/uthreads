@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+\#define _GNU_SOURCE
 #include "thread.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +17,6 @@
 //registre pour stackpointer et program counter
 #define JB_RSP 6
 #define JB_PC  7
-
-
 
 
 #ifdef USE_PREEM
@@ -112,7 +110,14 @@ static void unlock_preemption() {
 
 static void alarm_handler(int sig) {
     (void)sig;
-    thread_yield();
+    if (currentThread != NULL && currentThread->signals_blocked == 0) {
+
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGVTALRM);
+        sigprocmask(SIG_UNBLOCK, &set, NULL);
+        thread_yield();
+    }
 }
 
 void start_preemption() {
@@ -121,7 +126,7 @@ void start_preemption() {
 
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART; 
+    sa.sa_flags = SA_RESTART ;
     sigaction(SIGVTALRM, &sa, NULL);
 
     if (RUNNING_ON_VALGRIND) {
@@ -179,7 +184,7 @@ void thread_init() {
 #else
     /* enregistre le contexte actuel */
     #ifdef USE_PREEM
-        if (sigsetjmp(exitEnv, 1) != 0) {
+        if (sigsetjmp(exitEnv, 0) != 0) {
             exitFunc();
         }
     #else
@@ -264,7 +269,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 #else
     #ifdef USE_PREEM
         unlock_preemption();
-        sigsetjmp(newThread->env, 1);
+        sigsetjmp(newThread->env, 0);
     #else
         setjmp(newThread->env);
     #endif
