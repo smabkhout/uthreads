@@ -212,12 +212,6 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
         return -1;
     }
 
-    newThread->stack = malloc(SizeStack); 
-    // if (posix_memalign(&newThread->stack, PageSize, SizeStack) != 0) {
-    //     perror("posix_memalign");
-    //     free(newThread);
-    //     return -1;
-    // }
 
     newThread->stack = calloc(1, SizeStack); 
     if (newThread->stack == NULL) {
