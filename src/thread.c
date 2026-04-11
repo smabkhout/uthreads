@@ -194,12 +194,12 @@ thread_t thread_self() {
     return (thread_t) currentThread;
 }
 
-static void thread_wrapper(thread_s *thread) {
+static void thread_wrapper(void) {
     #ifdef USE_PREEM
-        // Reset critique pour les nouveaux threads
         signals_blocked = 0; 
         yield_pending = 0;
     #endif
+    thread_s *thread = currentThread; 
     void *retval = thread->func(thread->arg);
     thread_exit(retval);
 }
@@ -443,8 +443,10 @@ int thread_mutex_lock(thread_mutex_t *m)
         lock_preemption();
     #endif
     while (m->dummy) {
-        currentThread->state = BLOCKED;
-        TAILQ_INSERT_TAIL((struct mutexQueue*) m->waitingQueue, currentThread, entries);
+        if (currentThread->state != BLOCKED) {
+            currentThread->state = BLOCKED;
+            TAILQ_INSERT_TAIL((struct mutexQueue*) m->waitingQueue, currentThread, entries);
+        }
         //TAILQ_INSERT_TAIL(&blockedQueue, currentThread, entries);
         thread_yield();
     }
