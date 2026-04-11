@@ -19,6 +19,8 @@
 #define JB_PC  7
 
 
+
+
 #ifdef USE_PREEM
     #define SizeStack	8192*2
 #else
@@ -110,14 +112,7 @@ static void unlock_preemption() {
 
 static void alarm_handler(int sig) {
     (void)sig;
-    if (currentThread != NULL && currentThread->signals_blocked == 0) {
-
-        sigset_t set;
-        sigemptyset(&set);
-        sigaddset(&set, SIGVTALRM);
-        sigprocmask(SIG_UNBLOCK, &set, NULL);
-        thread_yield();
-    }
+    thread_yield();
 }
 
 void start_preemption() {
@@ -126,7 +121,7 @@ void start_preemption() {
 
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART ;
+    sa.sa_flags = SA_RESTART; 
     sigaction(SIGVTALRM, &sa, NULL);
 
     if (RUNNING_ON_VALGRIND) {
@@ -184,7 +179,7 @@ void thread_init() {
 #else
     /* enregistre le contexte actuel */
     #ifdef USE_PREEM
-        if (sigsetjmp(exitEnv, 0) != 0) {
+        if (sigsetjmp(exitEnv, 1) != 0) {
             exitFunc();
         }
     #else
@@ -269,7 +264,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 #else
     #ifdef USE_PREEM
         unlock_preemption();
-        sigsetjmp(newThread->env, 0);
+        sigsetjmp(newThread->env, 1);
     #else
         setjmp(newThread->env);
     #endif
