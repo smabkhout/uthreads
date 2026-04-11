@@ -54,6 +54,7 @@ struct thread_s {
     void *retval;
     struct thread_s *joiningThread; 
     TAILQ_ENTRY(thread_s) entries; // reference au thread suivant et thread precedent
+    volatile int signals_blocked;
 };
 
 typedef struct thread_s thread_s;
@@ -95,17 +96,15 @@ static void exitFunc() {
 
 #ifdef USE_PREEM
 static void lock_preemption() {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGVTALRM);
-    sigprocmask(SIG_BLOCK, &set, NULL);
+    if (currentThread != NULL) {
+        currentThread->signals_blocked++;
+    }
 }
 
 static void unlock_preemption() {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGVTALRM);
-    sigprocmask(SIG_UNBLOCK, &set, NULL);
+    if (currentThread != NULL) {
+        currentThread->signals_blocked--;
+    }
 }
 
 
@@ -154,6 +153,10 @@ void thread_init() {
     currentThread->joiningThread = NULL;
     currentThread->stack = NULL; // pile principale
 
+    #ifdef USE_PREEM
+        currentThread->signals_blocked = 0; 
+    #endif
+
 #ifdef USE_CONTEXT
     if (getcontext(&currentThread->context) == -1) {
         perror("Erreur lors du getcontext du main");
@@ -195,12 +198,12 @@ static void thread_wrapper(void) {
 }
 
 int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
-    #ifdef USE_PREEM
-        lock_preemption();
-    #endif
     if (currentThread == NULL) {
         thread_init();
     }
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
     thread_s *newThread = (thread_s*) malloc(sizeof(thread_s));
     if (newThread == NULL) return -1;
 
@@ -230,6 +233,9 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
     newThread->func = func;
     newThread->arg = arg;
+    #ifdef USE_PREEM
+        newThread->signals_blocked = 0; 
+    #endif
 
 #ifdef USE_CONTEXT
     if (getcontext(&newThread->context) == -1) {
@@ -296,7 +302,7 @@ int thread_yield(){
     swapcontext(&oldThread->context, &nextThread->context);
 #else
     #ifdef USE_PREEM
-        if (sigsetjmp(oldThread->env, 1) == 0) {
+        if (sigsetjmp(oldThread->env, 0) == 0) {
             siglongjmp(nextThread->env, 1);
         }
     #else
