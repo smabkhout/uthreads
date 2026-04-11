@@ -119,7 +119,7 @@ void start_preemption() {
 
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART; 
+    sa.sa_flags = SA_RESTART ; 
     sigaction(SIGVTALRM, &sa, NULL);
 
     if (RUNNING_ON_VALGRIND) {
@@ -320,6 +320,12 @@ int thread_yield(){
     #endif
 #endif
     #ifdef USE_PREEM
+
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGVTALRM);
+        sigprocmask(SIG_UNBLOCK, &set, NULL);
+
         unlock_preemption();
     #endif
     return 0;
