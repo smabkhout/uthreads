@@ -262,7 +262,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 #else
     #ifdef USE_PREEM
         unlock_preemption();
-        sigsetjmp(newThread->env, 0);
+        sigsetjmp(newThread->env, 1);
     #else
         setjmp(newThread->env);
     #endif
