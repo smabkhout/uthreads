@@ -110,7 +110,14 @@ static void unlock_preemption() {
 
 static void alarm_handler(int sig) {
     (void)sig;
-    thread_yield();
+    if (currentThread != NULL && currentThread->signals_blocked == 0) {
+
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGVTALRM);
+        sigprocmask(SIG_UNBLOCK, &set, NULL);
+        thread_yield();
+    }
 }
 
 void start_preemption() {
@@ -177,7 +184,7 @@ void thread_init() {
 #else
     /* enregistre le contexte actuel */
     #ifdef USE_PREEM
-        if (sigsetjmp(exitEnv, 0) != 0) {
+        if (sigsetjmp(exitEnv, 1) != 0) {
             exitFunc();
         }
     #else
@@ -310,7 +317,7 @@ int thread_yield(){
     swapcontext(&oldThread->context, &nextThread->context);
 #else
     #ifdef USE_PREEM
-        if (sigsetjmp(oldThread->env, 0) == 0) {
+        if (sigsetjmp(oldThread->env, 1) == 0) {
             siglongjmp(nextThread->env, 1);
         }
     #else
