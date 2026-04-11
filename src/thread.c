@@ -204,8 +204,13 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     #ifdef USE_PREEM
         lock_preemption();
     #endif
-    thread_s *newThread = (thread_s*) malloc(sizeof(thread_s));
-    if (newThread == NULL) return -1;
+    thread_s *newThread = (thread_s*) calloc(1, sizeof(thread_s));
+    if (newThread == NULL) {
+        #ifdef USE_PREEM
+            unlock_preemption();
+        #endif
+        return -1;
+    }
 
     newThread->stack = malloc(SizeStack); 
     // if (posix_memalign(&newThread->stack, PageSize, SizeStack) != 0) {
@@ -214,8 +219,12 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     //     return -1;
     // }
 
+    newThread->stack = calloc(1, SizeStack); 
     if (newThread->stack == NULL) {
         free(newThread);
+        #ifdef USE_PREEM
+            unlock_preemption();
+        #endif
         return -1;
     }
     //detection debordement de pile avec mprotect
