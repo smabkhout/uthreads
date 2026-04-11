@@ -124,7 +124,7 @@ void start_preemption() {
     sigaction(SIGVTALRM, &sa, NULL);
 
     it.it_interval.tv_sec = 0;
-    it.it_interval.tv_usec = 5000; 
+    it.it_interval.tv_usec = 10000; 
     it.it_value = it.it_interval;
 
     setitimer(ITIMER_VIRTUAL, &it, NULL);
