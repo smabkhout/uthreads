@@ -54,6 +54,7 @@ struct thread_s {
     void *retval;
     struct thread_s *joiningThread; 
     TAILQ_ENTRY(thread_s) entries; // reference au thread suivant et thread precedent
+    volatile int signals_blocked;
 };
 
 typedef struct thread_s thread_s;
@@ -95,23 +96,27 @@ static void exitFunc() {
 
 #ifdef USE_PREEM
 static void lock_preemption() {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGVTALRM);
-    sigprocmask(SIG_BLOCK, &set, NULL);
+    // Une simple addition en mémoire (ultra-rapide, 0 appel système)
+    if (currentThread != NULL) {
+        currentThread->signals_blocked++;
+    }
 }
 
 static void unlock_preemption() {
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGVTALRM);
-    sigprocmask(SIG_UNBLOCK, &set, NULL);
+    // Une simple soustraction
+    if (currentThread != NULL) {
+        currentThread->signals_blocked--;
+    }
 }
-
 
 static void alarm_handler(int sig) {
     (void)sig;
-    thread_yield();
+    // Si le thread actuel n'est pas dans une zone critique, il passe la main.
+    // S'il est dans une zone critique (signals_blocked > 0), on ignore simplement 
+    // l'alarme. Elle resonnera à nouveau dans 5ms de toute façon !
+    if (currentThread != NULL && currentThread->signals_blocked == 0) {
+        thread_yield();
+    }
 }
 
 void start_preemption() {
@@ -124,7 +129,7 @@ void start_preemption() {
     sigaction(SIGVTALRM, &sa, NULL);
 
     it.it_interval.tv_sec = 0;
-    it.it_interval.tv_usec = 20000; 
+    it.it_interval.tv_usec = 5000; 
     it.it_value = it.it_interval;
 
     setitimer(ITIMER_VIRTUAL, &it, NULL);
@@ -153,6 +158,7 @@ void thread_init() {
     currentThread->state = RUNNING;
     currentThread->joiningThread = NULL;
     currentThread->stack = NULL; // pile principale
+    currentThread->signals_blocked = 0;
 
 #ifdef USE_CONTEXT
     if (getcontext(&currentThread->context) == -1) {
