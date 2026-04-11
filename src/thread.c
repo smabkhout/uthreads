@@ -27,9 +27,10 @@
 
 #define PageSize 4096
 
-
-static volatile int signals_blocked = 0; 
-static volatile int yield_pending = 0; 
+#ifdef USE_PREEM
+    static volatile int signals_blocked = 0; 
+    static volatile int yield_pending = 0; 
+#endif
 
 enum threadState {
     READY,
