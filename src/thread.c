@@ -124,7 +124,7 @@ void start_preemption() {
 
     if (RUNNING_ON_VALGRIND) {
         it.it_interval.tv_sec = 0;
-        it.it_interval.tv_usec = 100000; 
+        it.it_interval.tv_usec = 500000; 
     } else {
         it.it_interval.tv_sec = 0;
         it.it_interval.tv_usec = 20000; 
