@@ -19,8 +19,6 @@
 #define JB_PC  7
 
 
-
-
 #ifdef USE_PREEM
     #define SizeStack	8192*2
 #else
