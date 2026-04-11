@@ -119,7 +119,7 @@ void start_preemption() {
 
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART ; 
+    sa.sa_flags = SA_RESTART | SA_NODEFER;
     sigaction(SIGVTALRM, &sa, NULL);
 
     if (RUNNING_ON_VALGRIND) {
@@ -127,7 +127,7 @@ void start_preemption() {
         it.it_interval.tv_usec = 500000; 
     } else {
         it.it_interval.tv_sec = 0;
-        it.it_interval.tv_usec = 1000; 
+        it.it_interval.tv_usec = 5000; 
     }
     it.it_value = it.it_interval;
 
@@ -320,12 +320,6 @@ int thread_yield(){
     #endif
 #endif
     #ifdef USE_PREEM
-
-        sigset_t set;
-        sigemptyset(&set);
-        sigaddset(&set, SIGVTALRM);
-        sigprocmask(SIG_UNBLOCK, &set, NULL);
-
         unlock_preemption();
     #endif
     return 0;
