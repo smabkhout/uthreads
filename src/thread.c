@@ -184,7 +184,7 @@ void thread_init() {
 #else
     /* enregistre le contexte actuel */
     #ifdef USE_PREEM
-        if (sigsetjmp(exitEnv, 1) != 0) {
+        if (sigsetjmp(exitEnv, 0) != 0) {
             exitFunc();
         }
     #else
@@ -269,7 +269,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 #else
     #ifdef USE_PREEM
         unlock_preemption();
-        sigsetjmp(newThread->env, 1);
+        sigsetjmp(newThread->env, 0);
     #else
         setjmp(newThread->env);
     #endif
@@ -317,7 +317,7 @@ int thread_yield(){
     swapcontext(&oldThread->context, &nextThread->context);
 #else
     #ifdef USE_PREEM
-        if (sigsetjmp(oldThread->env, 1) == 0) {
+        if (sigsetjmp(oldThread->env, 0) == 0) {
             siglongjmp(nextThread->env, 1);
         }
     #else
