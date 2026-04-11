@@ -10,7 +10,7 @@ all: build_tests
 # Compile src into a library in install/lib
 install/lib/libthread.a: $(SRC)
 	mkdir -p install/lib
-	$(CC) $(CFLAGS) -c $(SRC)
+	$(CC) $(CFLAGS) -DUSE_PREEM -c $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
@@ -33,7 +33,7 @@ build_tests: install/lib/libthread.a $(TEST_BINS)
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a
 	mkdir -p install/bin
-	$(CC) $(CFLAGS) $< install/lib/libthread.a -o $@
+	$(CC) $(CFLAGS) -DUSE_PREEM $< install/lib/libthread.a -o $@
 
 pthreads: $(TESTS)
 	@for t in $(TESTS); do \
