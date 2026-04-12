@@ -1,4 +1,4 @@
-\#define _GNU_SOURCE
+#define _GNU_SOURCE
 #include "thread.h"
 #include <stdio.h>
 #include <stdlib.h>
