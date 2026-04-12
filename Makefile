@@ -10,7 +10,7 @@ all: build_tests
 # Compile src into a library in install/lib
 install/lib/libthread.a: $(SRC)
 	mkdir -p install/lib
-	$(CC) $(CFLAGS) -DUSE_PREEM -c $(SRC)
+	$(CC) $(CFLAGS) -c $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
