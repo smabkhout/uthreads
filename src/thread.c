@@ -128,7 +128,7 @@ void start_preemption() {
     sigaddset(&unblock_alarm_set, SIGVTALRM);
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART ;
+    sa.sa_flags = SA_RESTART | SA_NODEFER ;
     sigaction(SIGVTALRM, &sa, NULL);
 
     if (RUNNING_ON_VALGRIND) {
