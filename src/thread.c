@@ -318,7 +318,7 @@ int thread_yield(){
 #else
     #ifdef USE_PREEM
         if (sigsetjmp(oldThread->env, 0) == 0) {
-            siglongjmp(nextThread->env, 1);
+            longjmp(nextThread->env, 1);
         }
     #else
         if (setjmp(oldThread->env) == 0) {
@@ -400,7 +400,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
         setcontext(&exitContext);
 #else
     #ifdef USE_PREEM
-        siglongjmp(exitEnv, 1);
+        longjmp(exitEnv, 1);
     #else
         longjmp(exitEnv, 1);
     #endif
@@ -418,7 +418,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     setcontext(&nextThread->context);
 #else
     #ifdef USE_PREEM
-        siglongjmp(nextThread->env, 1);
+        longjmp(nextThread->env, 1);
     #else
         longjmp(nextThread->env, 1);
     #endif
