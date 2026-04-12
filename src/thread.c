@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+\#define _GNU_SOURCE
 #include "thread.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,10 +27,6 @@
 
 #define PageSize 4096
 
-#ifdef USE_PREEM
-static sigset_t unblock_alarm_set; 
-#endif
-
 
 enum threadState {
     READY,
@@ -44,7 +40,7 @@ struct thread_s {
     ucontext_t context;
 #else
     #ifdef USE_PREEM
-        jmp_buf env;
+        sigjmp_buf env;
     #else
         jmp_buf env;
     #endif
@@ -83,7 +79,7 @@ static char exitStack[8192];
 static ucontext_t exitContext;
 #else
     #ifdef USE_PREEM
-        static jmp_buf exitEnv;
+        static sigjmp_buf exitEnv;
     #else
         static jmp_buf exitEnv;
     #endif
@@ -99,13 +95,13 @@ static void exitFunc() {
 }
 
 #ifdef USE_PREEM
-static inline void lock_preemption() {
+static void lock_preemption() {
     if (currentThread != NULL) {
         currentThread->signals_blocked++;
     }
 }
 
-static inline void unlock_preemption() {
+static void unlock_preemption() {
     if (currentThread != NULL) {
         currentThread->signals_blocked--;
     }
@@ -115,7 +111,11 @@ static inline void unlock_preemption() {
 static void alarm_handler(int sig) {
     (void)sig;
     if (currentThread != NULL && currentThread->signals_blocked == 0) {
-        sigprocmask(SIG_UNBLOCK, &unblock_alarm_set, NULL);
+
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGVTALRM);
+        sigprocmask(SIG_UNBLOCK, &set, NULL);
         thread_yield();
     }
 }
@@ -124,11 +124,9 @@ void start_preemption() {
     struct sigaction sa;
     struct itimerval it;
 
-    sigemptyset(&unblock_alarm_set);
-    sigaddset(&unblock_alarm_set, SIGVTALRM);
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART | SA_NODEFER ;
+    sa.sa_flags = SA_RESTART ;
     sigaction(SIGVTALRM, &sa, NULL);
 
     if (RUNNING_ON_VALGRIND) {
@@ -186,7 +184,7 @@ void thread_init() {
 #else
     /* enregistre le contexte actuel */
     #ifdef USE_PREEM
-        if (setjmp(exitEnv) != 0) {
+        if (sigsetjmp(exitEnv, 0) != 0) {
             exitFunc();
         }
     #else
@@ -271,7 +269,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 #else
     #ifdef USE_PREEM
         unlock_preemption();
-        setjmp(newThread->env);
+        sigsetjmp(newThread->env, 0);
     #else
         setjmp(newThread->env);
     #endif
@@ -319,8 +317,8 @@ int thread_yield(){
     swapcontext(&oldThread->context, &nextThread->context);
 #else
     #ifdef USE_PREEM
-        if (setjmp(oldThread->env) == 0) {
-            longjmp(nextThread->env, 1);
+        if (sigsetjmp(oldThread->env, 0) == 0) {
+            siglongjmp(nextThread->env, 1);
         }
     #else
         if (setjmp(oldThread->env) == 0) {
@@ -402,7 +400,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
         setcontext(&exitContext);
 #else
     #ifdef USE_PREEM
-        longjmp(exitEnv, 1);
+        siglongjmp(exitEnv, 1);
     #else
         longjmp(exitEnv, 1);
     #endif
@@ -420,7 +418,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     setcontext(&nextThread->context);
 #else
     #ifdef USE_PREEM
-        longjmp(nextThread->env, 1);
+        siglongjmp(nextThread->env, 1);
     #else
         longjmp(nextThread->env, 1);
     #endif
