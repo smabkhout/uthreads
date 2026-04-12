@@ -27,6 +27,10 @@
 
 #define PageSize 4096
 
+#ifdef USE_PREEM
+static sigset_t unblock_alarm_set; 
+#endif
+
 
 enum threadState {
     READY,
@@ -111,11 +115,7 @@ static void unlock_preemption() {
 static void alarm_handler(int sig) {
     (void)sig;
     if (currentThread != NULL && currentThread->signals_blocked == 0) {
-
-        sigset_t set;
-        sigemptyset(&set);
-        sigaddset(&set, SIGVTALRM);
-        sigprocmask(SIG_UNBLOCK, &set, NULL);
+        sigprocmask(SIG_UNBLOCK, &unblock_alarm_set, NULL);
         thread_yield();
     }
 }
@@ -124,6 +124,8 @@ void start_preemption() {
     struct sigaction sa;
     struct itimerval it;
 
+    sigemptyset(&unblock_alarm_set);
+    sigaddset(&unblock_alarm_set, SIGVTALRM);
     sa.sa_handler = alarm_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART ;
