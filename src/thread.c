@@ -44,7 +44,7 @@ struct thread_s {
     ucontext_t context;
 #else
     #ifdef USE_PREEM
-        sigjmp_buf env;
+        jmp_buf env;
     #else
         jmp_buf env;
     #endif
@@ -83,7 +83,7 @@ static char exitStack[8192];
 static ucontext_t exitContext;
 #else
     #ifdef USE_PREEM
-        static sigjmp_buf exitEnv;
+        static jmp_buf exitEnv;
     #else
         static jmp_buf exitEnv;
     #endif
@@ -99,13 +99,13 @@ static void exitFunc() {
 }
 
 #ifdef USE_PREEM
-static void lock_preemption() {
+static inline void lock_preemption() {
     if (currentThread != NULL) {
         currentThread->signals_blocked++;
     }
 }
 
-static void unlock_preemption() {
+static inline void unlock_preemption() {
     if (currentThread != NULL) {
         currentThread->signals_blocked--;
     }
