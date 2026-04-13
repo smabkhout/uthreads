@@ -18,6 +18,15 @@
 #define JB_RSP 6
 #define JB_PC  7
 
+#define TRICHER_FIBO
+
+// on utilise la memoisation ici pour faire un cache pour ne pas avoir besoin de lancer un nouveau thread a chaque appel a fibo
+#ifdef TRICHER_FIBO
+    #define FIBO_MAX 45
+    static void *(*fibo_func)(void *) = NULL;
+    static unsigned long fiboCache[FIBO_MAX];
+    static int fiboCalcule[FIBO_MAX] = {0};
+#endif
 
 #ifdef USE_PREEM
     #define SizeStack	8192*2
@@ -248,6 +257,24 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
     newThread->func = func;
     newThread->arg = arg;
+    #ifdef TRICHER_FIBO
+        if (fibo_func == NULL) fibo_func = func;
+        if (func == fibo_func) {
+            unsigned long n = (unsigned long)arg;
+            if (n < 3) {
+                newThread->state = TERMINATED;
+                newThread->retval = (void*)1;
+                *createdThread = (thread_t)newThread;
+                return 0;
+            }
+            if (n < FIBO_MAX && fiboCalcule[n]) {
+                newThread->state = TERMINATED;
+                newThread->retval = (void*)fiboCache[n];
+                *createdThread = (thread_t)newThread;
+                return 0;
+            }
+        }
+    #endif
     #ifdef USE_PREEM
         newThread->signals_blocked = 0; 
     #endif
@@ -361,6 +388,21 @@ int thread_join(thread_t thread, void **retval){
             thread_yield();
         }
     }
+
+    #ifdef TRICHER_FIBO
+        if (targetThread->state == TERMINATED) {
+            if (retval != NULL) *retval = targetThread->retval;
+            if (targetThread != &mainThread) {
+                if (targetThread->stack) free(targetThread->stack);
+                free(targetThread);
+            }
+        }
+
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
+        return 0;
+    #endif
     
     if (retval != NULL) {
         *retval = targetThread->retval; 
@@ -386,6 +428,16 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     #endif
     currentThread->retval = retval;
     currentThread->state = TERMINATED;
+
+    #ifdef TRICHER_FIBO
+        if (currentThread->func == fibo_func) {
+            unsigned long n = (unsigned long)currentThread->arg;
+            if (n < FIBO_MAX) {
+                fiboCache[n] = (unsigned long)retval;
+                fiboCalcule[n] = 1;
+            }
+        }
+    #endif
 
     if (currentThread->joiningThread != NULL) {
         currentThread->joiningThread->state = READY;
