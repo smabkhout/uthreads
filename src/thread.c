@@ -18,7 +18,7 @@
 #define JB_RSP 6
 #define JB_PC  7
 
-#define TRICHER_FIBO
+// #define TRICHER_FIBO
 
 // on utilise la memoisation ici pour faire un cache pour ne pas avoir besoin de lancer un nouveau thread a chaque appel a fibo
 #ifdef TRICHER_FIBO
