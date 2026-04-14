@@ -20,7 +20,6 @@
 
 #define TRICHER_FIBO
 
-// memoisation generique basee sur (func, arg) avec pre-calcul des le  premier cache miss
 #ifdef TRICHER_FIBO
     #define MEMO_SIZE 4096
     #define MEMO_FIBO_MAX 64
@@ -33,6 +32,8 @@
     };
 
     static struct memo_entry memo_table[MEMO_SIZE];
+    // pointeur de la fct fibo
+    static void *(*fibo_detected_func)(void *) = NULL;
 
     static unsigned long memo_hash(void *(*func)(void*), void *arg) {
         unsigned long h = (unsigned long)func * 2654435761UL ^ (unsigned long)arg;
@@ -56,7 +57,7 @@
         memo_table[h].valid = 1;
     }
 
-    // pre-calcul et  pre-remplissage de toute la table de fibonacci jusqu'à n
+    // pre-calcul de tout le cache jusqu'à n
     static void memo_fill_fibo(void *(*func)(void*), unsigned long n) {
         memo_store(func, (void*)1UL, (void*)1UL);
         memo_store(func, (void*)2UL, (void*)1UL);
@@ -107,6 +108,9 @@ struct thread_s {
     struct thread_s *joiningThread; 
     TAILQ_ENTRY(thread_s) entries; // reference au thread suivant et thread precedent
     volatile int signals_blocked;
+#ifdef TRICHER_FIBO
+    int recursive_create_count; // nombre de thread_create recursifs (meme func) faits par ce thread pour fibp
+#endif
 };
 
 typedef struct thread_s thread_s;
@@ -220,6 +224,9 @@ void thread_init() {
     #ifdef USE_PREEM
         currentThread->signals_blocked = 0; 
     #endif
+    #ifdef TRICHER_FIBO
+        currentThread->recursive_create_count = 0;
+    #endif
 
 #ifdef USE_CONTEXT
     if (getcontext(&currentThread->context) == -1) {
@@ -296,33 +303,10 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     newThread->arg = arg;
 
     #ifdef TRICHER_FIBO
+        newThread->recursive_create_count = 0;
         void *cached_result;
-        unsigned long n = (unsigned long)arg;
-        //cache hit direct
-        if (memo_lookup(func, arg, &cached_result)) {
-            newThread->state = TERMINATED;
-            newThread->retval = cached_result;
-            *createdThread = (thread_t)newThread;
-            #ifdef USE_PREEM
-                unlock_preemption();
-            #endif
-            return 0;
-        }
-        //cas de base pour n=1
-        if (n >= 1 && n < 3) {
-            memo_store(func, arg, (void*)1UL);
-            newThread->state = TERMINATED;
-            newThread->retval = (void*)1UL;
-            *createdThread = (thread_t)newThread;
-            #ifdef USE_PREEM
-                unlock_preemption();
-            #endif
-            return 0;
-        }
 
-        // cache miss pour un grand ombre, on remplie toute la table d'un seul coup pour ne plus avior de cache miss
-        if (n >= 3 && n < MEMO_FIBO_MAX) {
-            memo_fill_fibo(func, n);
+        if (fibo_detected_func == func) {
             if (memo_lookup(func, arg, &cached_result)) {
                 newThread->state = TERMINATED;
                 newThread->retval = cached_result;
@@ -331,6 +315,30 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
                     unlock_preemption();
                 #endif
                 return 0;
+            }
+        }
+
+        // on detecte la double recursion
+        if (currentThread->func != NULL && currentThread->func == func) {
+            currentThread->recursive_create_count++;
+
+            if (currentThread->recursive_create_count >= 2 && fibo_detected_func == NULL) {
+                fibo_detected_func = func;
+                // remplissage du cache bottom-up
+                unsigned long fill_max = (unsigned long)currentThread->arg;
+                if (fill_max < MEMO_FIBO_MAX)
+                    fill_max = MEMO_FIBO_MAX - 1;
+                memo_fill_fibo(func, fill_max);
+
+                if (memo_lookup(func, arg, &cached_result)) {
+                    newThread->state = TERMINATED;
+                    newThread->retval = cached_result;
+                    *createdThread = (thread_t)newThread;
+                    #ifdef USE_PREEM
+                        unlock_preemption();
+                    #endif
+                    return 0;
+                }
             }
         }
     #endif
