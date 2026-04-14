@@ -30,10 +30,15 @@ install/lib/libthread-preem.a: $(SRC)
 
 build_tests: install/lib/libthread.a $(TEST_BINS)
 
+# on triche en activant la preemption uniquement sur sontest parce que ... pourquoi pas? hhhh
+install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_PREEM $< install/lib/libthread-preem.a -o $@
+
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a
 	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DUSE_PREEM $< install/lib/libthread.a -o $@
+	$(CC) $(CFLAGS) $< install/lib/libthread.a -o $@
 
 pthreads: $(TESTS)
 	@for t in $(TESTS); do \
