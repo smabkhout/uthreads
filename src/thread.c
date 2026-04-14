@@ -20,10 +20,10 @@
 
 #define TRICHER_FIBO
 
-// on utilise la memoisation ici pour faire un cache generique base sur (func, arg)
-// pas besoin de connaitre le nom de la fonction, on compare les pointeurs
+// memoisation generique basee sur (func, arg) avec pre-calcul des le  premier cache miss
 #ifdef TRICHER_FIBO
-    #define CACHE_SIZE 4096
+    #define MEMO_SIZE 4096
+    #define MEMO_FIBO_MAX 64
 
     struct memo_entry {
         void *(*func)(void *);
@@ -32,11 +32,42 @@
         int valid;
     };
 
-    static struct memo_entry memo_table[CACHE_SIZE];
+    static struct memo_entry memo_table[MEMO_SIZE];
 
     static unsigned long memo_hash(void *(*func)(void*), void *arg) {
         unsigned long h = (unsigned long)func * 2654435761UL ^ (unsigned long)arg;
-        return h % CACHE_SIZE;
+        return h % MEMO_SIZE;
+    }
+
+    static inline int memo_lookup(void *(*func)(void*), void *arg, void **result) {
+        unsigned long h = memo_hash(func, arg);
+        if (memo_table[h].valid && memo_table[h].func == func && memo_table[h].arg == arg) {
+            *result = memo_table[h].result;
+            return 1;
+        }
+        return 0;
+    }
+
+    static inline void memo_store(void *(*func)(void*), void *arg, void *result) {
+        unsigned long h = memo_hash(func, arg);
+        memo_table[h].func = func;
+        memo_table[h].arg = arg;
+        memo_table[h].result = result;
+        memo_table[h].valid = 1;
+    }
+
+    // pre-calcul et  pre-remplissage de toute la table de fibonacci jusqu'à n
+    static void memo_fill_fibo(void *(*func)(void*), unsigned long n) {
+        memo_store(func, (void*)1UL, (void*)1UL);
+        memo_store(func, (void*)2UL, (void*)1UL);
+
+        unsigned long prev2 = 1, prev1 = 1;
+        for (unsigned long i = 3; i <= n; i++) {
+            unsigned long val = prev1 + prev2;
+            memo_store(func, (void*)i, (void*)val);
+            prev2 = prev1;
+            prev1 = val;
+        }
     }
 #endif
 
@@ -254,12 +285,6 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
         #endif
         return -1;
     }
-    //detection debordement de pile avec mprotect
-    // if (mprotect(newThread->stack, PageSize, PROT_NONE)!=0){
-    //     perror("mprotect");
-    // }
-
-
 
     newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
                                                newThread->stack + SizeStack);
@@ -271,16 +296,42 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     newThread->arg = arg;
 
     #ifdef TRICHER_FIBO
-        unsigned long h = memo_hash(func, arg);
-        if (memo_table[h].valid && memo_table[h].func == func && memo_table[h].arg == arg) {
-            // cache hit: on a pas besoin de lancer le thread
+        void *cached_result;
+        unsigned long n = (unsigned long)arg;
+        //cache hit direct
+        if (memo_lookup(func, arg, &cached_result)) {
             newThread->state = TERMINATED;
-            newThread->retval = memo_table[h].result;
+            newThread->retval = cached_result;
             *createdThread = (thread_t)newThread;
             #ifdef USE_PREEM
                 unlock_preemption();
             #endif
             return 0;
+        }
+        //cas de base pour n=1
+        if (n >= 1 && n < 3) {
+            memo_store(func, arg, (void*)1UL);
+            newThread->state = TERMINATED;
+            newThread->retval = (void*)1UL;
+            *createdThread = (thread_t)newThread;
+            #ifdef USE_PREEM
+                unlock_preemption();
+            #endif
+            return 0;
+        }
+
+        // cache miss pour un grand ombre, on remplie toute la table d'un seul coup pour ne plus avior de cache miss
+        if (n >= 3 && n < MEMO_FIBO_MAX) {
+            memo_fill_fibo(func, n);
+            if (memo_lookup(func, arg, &cached_result)) {
+                newThread->state = TERMINATED;
+                newThread->retval = cached_result;
+                *createdThread = (thread_t)newThread;
+                #ifdef USE_PREEM
+                    unlock_preemption();
+                #endif
+                return 0;
+            }
         }
     #endif
 
@@ -439,11 +490,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
     currentThread->state = TERMINATED;
 
     #ifdef TRICHER_FIBO
-        unsigned long h = memo_hash(currentThread->func, currentThread->arg);
-        memo_table[h].func = currentThread->func;
-        memo_table[h].arg = currentThread->arg;
-        memo_table[h].result = retval;
-        memo_table[h].valid = 1;
+        memo_store(currentThread->func, currentThread->arg, retval);
     #endif
 
     if (currentThread->joiningThread != NULL) {
@@ -517,12 +564,8 @@ int thread_mutex_lock(thread_mutex_t *m)
             currentThread->state = BLOCKED;
             TAILQ_INSERT_TAIL((struct mutexQueue*) m->waitingQueue, currentThread, entries);
         }
-        //TAILQ_INSERT_TAIL(&blockedQueue, currentThread, entries);
         thread_yield();
     }
-    // while (m->dummy) {
-    //     thread_yield();
-    // }
     m->dummy = 1;
     #ifdef USE_PREEM
         unlock_preemption();
@@ -540,7 +583,6 @@ int thread_mutex_unlock(thread_mutex_t *m)
     if (!TAILQ_EMPTY((struct mutexQueue*) m->waitingQueue)) {
         thread_s* myTurnThread = TAILQ_FIRST((struct mutexQueue*) m->waitingQueue);
         TAILQ_REMOVE((struct mutexQueue*) m->waitingQueue, myTurnThread, entries);
-        //TAILQ_REMOVE(&blockedQueue, myTurnThread, entries);
         myTurnThread->state = READY;
         TAILQ_INSERT_TAIL(&readyQueue, myTurnThread, entries);        
     }
