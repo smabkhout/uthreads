@@ -89,15 +89,10 @@ enum threadState {
 };
 
 struct thread_s {
-    #ifdef USE_CONTEXT
+#ifdef USE_CONTEXT
     ucontext_t context;
 #else
-    #ifdef USE_PREEM
-        sigjmp_buf env;
-    #else
-        jmp_buf env;
-    #endif
-
+    jmp_buf env;
 #endif
     void *stack;
     int valgrind_stackid; //pour valgrind
@@ -134,11 +129,7 @@ static char exitStack[8192];
 // il faut lui donner ce contexte avec cette stack avant de free so stack "dynamique"
 static ucontext_t exitContext;
 #else
-    #ifdef USE_PREEM
-        static sigjmp_buf exitEnv;
-    #else
-        static jmp_buf exitEnv;
-    #endif
+    static jmp_buf exitEnv;
 #endif
 
 
@@ -241,16 +232,9 @@ void thread_init() {
     exitContext.uc_link = NULL;
     makecontext(&exitContext, exitFunc, 0);
 #else
-    /* enregistre le contexte actuel */
-    #ifdef USE_PREEM
-        if (sigsetjmp(exitEnv, 0) != 0) {
-            exitFunc();
-        }
-    #else
-        if (setjmp(exitEnv) != 0) {
-            exitFunc();
-        }
-    #endif
+    if (setjmp(exitEnv) != 0) {
+        exitFunc();
+    }
 #endif
 #ifdef USE_PREEM
     start_preemption();
@@ -364,10 +348,9 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 #else
     #ifdef USE_PREEM
         unlock_preemption();
-        sigsetjmp(newThread->env, 0);
-    #else
-        setjmp(newThread->env);
     #endif
+
+    setjmp(newThread->env);
 
     #ifdef USE_PREEM
         lock_preemption();
@@ -411,15 +394,9 @@ int thread_yield(){
 #ifdef USE_CONTEXT
     swapcontext(&oldThread->context, &nextThread->context);
 #else
-    #ifdef USE_PREEM
-        if (sigsetjmp(oldThread->env, 0) == 0) {
-            siglongjmp(nextThread->env, 1);
-        }
-    #else
-        if (setjmp(oldThread->env) == 0) {
-            longjmp(nextThread->env, 1);
-        }
-    #endif
+    if (setjmp(oldThread->env) == 0) {
+        longjmp(nextThread->env, 1);
+    }
 #endif
     #ifdef USE_PREEM
         unlock_preemption();
@@ -513,11 +490,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
 #ifdef USE_CONTEXT
         setcontext(&exitContext);
 #else
-    #ifdef USE_PREEM
-        siglongjmp(exitEnv, 1);
-    #else
         longjmp(exitEnv, 1);
-    #endif
 #endif
         assert(0);
     }
@@ -531,11 +504,7 @@ __attribute__((noreturn)) void thread_exit(void *retval) {
 #ifdef USE_CONTEXT
     setcontext(&nextThread->context);
 #else
-    #ifdef USE_PREEM
-        siglongjmp(nextThread->env, 1);
-    #else
-        longjmp(nextThread->env, 1);
-    #endif
+    longjmp(nextThread->env, 1);
 #endif
     assert(0);
     #ifdef USE_PREEM

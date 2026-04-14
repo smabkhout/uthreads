@@ -61,6 +61,15 @@ check: build_tests
 		./$$test || true; \
 	done
 
+check_all: install
+	@echo "=== Running ALL tests in install/bin/ ==="
+	@for test in install/bin/*; do \
+		if [ -x "$$test" ] && [ ! -d "$$test" ]; then \
+			echo "Running $$test..."; \
+			./$$test; \
+		fi \
+	done
+
 valgrind: build_tests
 	@for test in $(TEST_BINS); do \
 		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test || true; \
