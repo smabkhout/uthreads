@@ -79,6 +79,8 @@
 #endif
 
 #define PageSize 4096
+// taille doit etre alignee sur 16 octets, meme chose que : sizeof(thread_s) % 16 == 0 ? sizeof(thread_s) : sizeof(thread_s) + 16 - sizeof(thread_s) % 16
+#define THREAD_ALLOC_SIZE (((sizeof(thread_s)) + 15) & ~(size_t)15)
 
 
 enum threadState {
@@ -135,7 +137,7 @@ static ucontext_t exitContext;
 
 static void exitFunc() {
     if (currentThread != &mainThread) {
-        free(currentThread->stack);
+        // un seul free car maintenant les deux se font avec le meme malloc
         free(currentThread);
     }
     exit(0);
@@ -259,24 +261,17 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     #ifdef USE_PREEM
         lock_preemption();
     #endif
-    thread_s *newThread = (thread_s*) calloc(1, sizeof(thread_s));
-    if (newThread == NULL) {
+
+    void *block = malloc(THREAD_ALLOC_SIZE + SizeStack);
+    if (block == NULL) {
         #ifdef USE_PREEM
             unlock_preemption();
         #endif
         return -1;
     }
 
-
-    newThread->stack = calloc(1, SizeStack); 
-    if (newThread->stack == NULL) {
-        free(newThread);
-        #ifdef USE_PREEM
-            unlock_preemption();
-        #endif
-        return -1;
-    }
-
+    thread_s *newThread = (thread_s *)block;
+    newThread->stack = (char *)block + THREAD_ALLOC_SIZE; // les deux blocs sont contigues, on reduit le nombre de malloc et de free necesssaire
     newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
                                                newThread->stack + SizeStack);
 
@@ -333,7 +328,6 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
 #ifdef USE_CONTEXT
     if (getcontext(&newThread->context) == -1) {
-        free(newThread->stack);
         free(newThread);
         return -1;
     }
@@ -438,7 +432,7 @@ int thread_join(thread_t thread, void **retval){
         if (targetThread->state == TERMINATED) {
             if (retval != NULL) *retval = targetThread->retval;
             if (targetThread != &mainThread) {
-                if (targetThread->stack) free(targetThread->stack);
+                VALGRIND_STACK_DEREGISTER(targetThread->valgrind_stackid);
                 free(targetThread);
             }
         }
@@ -453,10 +447,8 @@ int thread_join(thread_t thread, void **retval){
         *retval = targetThread->retval; 
     }
 
-    
-    
     if (targetThread != &mainThread) {
-        if (targetThread->stack) free(targetThread->stack);
+        VALGRIND_STACK_DEREGISTER(targetThread->valgrind_stackid);
         free(targetThread);
     }
     #ifdef USE_PREEM
