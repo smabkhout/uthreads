@@ -44,6 +44,10 @@ install/lib/libthread-fibo.a: $(SRC)
 
 build_tests: install/lib/libthread.a $(TEST_BINS)
 
+install/bin/62-mutex: test/62-mutex.c install/lib/libthread-mutex_61.a
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_MUTEX_61 $< install/lib/libthread-mutex_61.a -o $@
+
 install/bin/61-mutex: test/61-mutex.c install/lib/libthread-mutex_61.a
 	mkdir -p install/bin
 	$(CC) $(CFLAGS) -DUSE_MUTEX_61 $< install/lib/libthread-mutex_61.a -o $@
