@@ -28,12 +28,24 @@ install/lib/libthread-preem.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+# Compile src with fibo cheat into a library
+install/lib/libthread-fibo.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DTRICHER_FIBO -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 build_tests: install/lib/libthread.a $(TEST_BINS)
 
 # on triche en activant la preemption uniquement sur sontest parce que ... pourquoi pas? hhhh
 install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
 	mkdir -p install/bin
 	$(CC) $(CFLAGS) -DUSE_PREEM $< install/lib/libthread-preem.a -o $@
+
+# on triche dans le test de fibo aussi parce que ... pourquoi pas? hhhh
+install/bin/51-fibonacci: test/51-fibonacci.c install/lib/libthread-fibo.a
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DTRICHER_FIBO $< install/lib/libthread-fibo.a -o $@
 
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a
