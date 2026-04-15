@@ -18,6 +18,8 @@
 #define JB_RSP 6
 #define JB_PC  7
 
+#define TRICHER_FIBO
+
 #ifdef TRICHER_FIBO
     #define MEMO_SIZE 4096
     #define MEMO_FIBO_MAX 64
@@ -297,6 +299,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
     thread_s *newThread = NULL;
 
+    // 1. On tente de recycler un thread
     if (!TAILQ_EMPTY(&freeQueue)) {
         newThread = TAILQ_FIRST(&freeQueue);
         TAILQ_REMOVE(&freeQueue, newThread, entries);
@@ -441,9 +444,16 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 }
 
 int thread_yield(){
+    #ifdef USE_MUTEX_61
+        if (currentThread->state == RUNNING && currentThread != &mainThread) {
+            return 0; 
+        }
+    #endif  
+
     #ifdef USE_PREEM
         lock_preemption();
     #endif
+
     thread_s *oldThread = currentThread;
     //cas si il y a personne d'autre
     if (init_done == 0 || TAILQ_EMPTY(&readyQueue)) {
@@ -530,16 +540,6 @@ int thread_join(thread_t thread, void **retval){
     #endif
 
     return 0;
-}
-
-// pour que la fct s'execute a la fin toujours
-__attribute__((destructor)) static void cleanup_free_list(void) {
-    thread_s *t;
-    while (!TAILQ_EMPTY(&freeQueue)) {
-        t = TAILQ_FIRST(&freeQueue);
-        TAILQ_REMOVE(&freeQueue, t, entries);
-        free(t);
-    }
 }
 
 // on specifie à gcc que la fct ne retourne pas pour eviter les warnings
