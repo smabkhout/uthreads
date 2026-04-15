@@ -21,6 +21,13 @@ install/lib/libthread-context.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+install/lib/libthread-mutex_61.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_MUTEX_61 -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
+
 # Compile src with preem support into a library
 install/lib/libthread-preem.a: $(SRC)
 	mkdir -p install/lib
@@ -36,6 +43,10 @@ install/lib/libthread-fibo.a: $(SRC)
 	rm -f *.o
 
 build_tests: install/lib/libthread.a $(TEST_BINS)
+
+install/bin/61-mutex: test/61-mutex.c install/lib/libthread-mutex_61.a
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_MUTEX_61 $< install/lib/libthread-mutex_61.a -o $@
 
 # on triche en activant la preemption uniquement sur sontest parce que ... pourquoi pas? hhhh
 install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
