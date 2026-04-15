@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "thread.h"
 
-extern void thread_init(void);
+//extern void thread_init(void);
 
 
 void *infinite_recursion(void *arg) {
@@ -16,7 +16,7 @@ void *infinite_recursion(void *arg) {
 }
 
 int main() {
-    thread_init(); //initialize the signal handler
+    //thread_init(); //initialize the signal handler
     thread_t th;
     printf("Starting stack overflow test...\n");
     thread_create(&th, infinite_recursion, NULL);
