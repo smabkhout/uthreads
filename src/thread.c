@@ -510,7 +510,7 @@ int thread_join(thread_t thread, void **retval){
             if (retval != NULL) *retval = targetThread->retval;
             if (targetThread != &mainThread) {
                 VALGRIND_STACK_DEREGISTER(targetThread->valgrind_stackid);
-                TAILQ_INSERT_TAIL(&freeQueue, targetThread, entries);
+                free(targetThread);
             }
         }
 
