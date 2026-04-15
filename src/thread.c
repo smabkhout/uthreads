@@ -18,6 +18,7 @@
 #define JB_RSP 6
 #define JB_PC  7
 
+#define TRICHER_FIBO
 
 #ifdef TRICHER_FIBO
     #define MEMO_SIZE 4096
@@ -298,6 +299,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
     thread_s *newThread = NULL;
 
+    // 1. On tente de recycler un thread
     if (!TAILQ_EMPTY(&freeQueue)) {
         newThread = TAILQ_FIRST(&freeQueue);
         TAILQ_REMOVE(&freeQueue, newThread, entries);
