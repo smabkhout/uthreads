@@ -114,8 +114,10 @@ typedef struct thread_s thread_s;
 TAILQ_HEAD(threadQueue, thread_s);
 TAILQ_HEAD(mutexQueue, thread_s);
 
+
 struct threadQueue readyQueue;
 struct threadQueue blockedQueue;
+struct threadQueue freeQueue;
 
 thread_s* currentThread;
 
@@ -235,6 +237,7 @@ void thread_init() {
     init_done = 1;
     TAILQ_INIT(&readyQueue);
     TAILQ_INIT(&blockedQueue);
+    TAILQ_INIT(&freeQueue);
 
     #ifdef USE_STACK_PROT
     setup_stack_protection();
@@ -294,49 +297,60 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
         lock_preemption();
     #endif
 
-    void *block = NULL;
+    thread_s *newThread = NULL;
 
-    #ifdef USE_STACK_PROT
-    size_t page_size = sysconf(_SC_PAGESIZE);
-    size_t struct_size_aligned = (THREAD_ALLOC_SIZE + page_size - 1) & ~(page_size - 1);
-    size_t total_len = struct_size_aligned + page_size + SizeStack;
+    // 1. On tente de recycler un thread
+    if (!TAILQ_EMPTY(&freeQueue)) {
+        newThread = TAILQ_FIRST(&freeQueue);
+        TAILQ_REMOVE(&freeQueue, newThread, entries);
+        
+        
+        newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
+                                                   newThread->stack + SizeStack);
+    } 
     
-    if (posix_memalign(&block, page_size, total_len) != 0) {
-        #ifdef USE_PREEM
-            unlock_preemption();
+    else {
+        void *block = NULL;
+
+        #ifdef USE_STACK_PROT
+        size_t page_size = sysconf(_SC_PAGESIZE);
+        size_t struct_size_aligned = (THREAD_ALLOC_SIZE + page_size - 1) & ~(page_size - 1);
+        size_t total_len = struct_size_aligned + page_size + SizeStack;
+        
+        if (posix_memalign(&block, page_size, total_len) != 0) {
+            #ifdef USE_PREEM
+                unlock_preemption();
+            #endif
+            return -1;
+        }
+
+        newThread = (thread_s *)block; 
+        void *guard_page = (char *)block + struct_size_aligned;
+        newThread->stack = (char *)guard_page + page_size;
+
+        if (mprotect(guard_page, page_size, PROT_NONE) == -1) {
+            perror("mprotect");
+            free(block);
+            #ifdef USE_PREEM
+                unlock_preemption();
+            #endif
+            return -1;
+        }
+        #else
+        block = malloc(THREAD_ALLOC_SIZE + SizeStack);
+        if (block == NULL) {
+            #ifdef USE_PREEM
+                unlock_preemption();
+            #endif
+            return -1;
+        }
+        newThread = (thread_s *)block;
+        newThread->stack = (char *)block + THREAD_ALLOC_SIZE;
         #endif
-        return -1;
+
+        newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
+                                                   newThread->stack + SizeStack);
     }
-
-    thread_s *newThread = (thread_s *)block;
-    //our guard page is the page right after the thread_s structure
-    void *guard_page = (char *)block + struct_size_aligned;
-    newThread->stack = (char *)guard_page + page_size;
-
-    //no access flag to the guard patch
-    if (mprotect(guard_page, page_size, PROT_NONE) == -1) {
-        perror("mprotect");
-        free(block);
-        #ifdef USE_PREEM
-            unlock_preemption();
-        #endif
-        return -1;
-    }
-    #else
-    block = malloc(THREAD_ALLOC_SIZE + SizeStack);
-    if (block == NULL) {
-        #ifdef USE_PREEM
-            unlock_preemption();
-        #endif
-        return -1;
-    }
-    thread_s *newThread = (thread_s *)block;
-    newThread->stack = (char *)block + THREAD_ALLOC_SIZE; // les deux blocs sont contigues, on reduit le nombre de malloc et de free necesssaire
-    #endif
-
-
-    newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
-                                               newThread->stack + SizeStack);
 
     newThread->state = READY;
     newThread->joiningThread = NULL;
@@ -512,12 +526,7 @@ int thread_join(thread_t thread, void **retval){
 
     if (targetThread != &mainThread) {
         VALGRIND_STACK_DEREGISTER(targetThread->valgrind_stackid);
-        #ifdef USE_STACK_PROT
-        //reset permissions
-        size_t page_size = sysconf(_SC_PAGESIZE);
-        mprotect((char*)targetThread + THREAD_ALLOC_SIZE, page_size, PROT_READ | PROT_WRITE);
-        #endif
-        free(targetThread);
+        TAILQ_INSERT_TAIL(&freeQueue, targetThread, entries);
     }
     #ifdef USE_PREEM
         unlock_preemption();
