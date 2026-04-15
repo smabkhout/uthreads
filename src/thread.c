@@ -17,8 +17,7 @@
 //registre pour stackpointer et program counter
 #define JB_RSP 6
 #define JB_PC  7
-
-
+#define TRICHER_FIBO
 
 #ifdef TRICHER_FIBO
     #define MEMO_SIZE 4096
