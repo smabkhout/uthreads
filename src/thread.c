@@ -78,10 +78,8 @@
     #define SizeStack	8192
 #endif
 
-#define PageSize 4096
 // taille doit etre alignee sur 16 octets, meme chose que : sizeof(thread_s) % 16 == 0 ? sizeof(thread_s) : sizeof(thread_s) + 16 - sizeof(thread_s) % 16
 #define THREAD_ALLOC_SIZE (((sizeof(thread_s)) + 15) & ~(size_t)15)
-
 
 enum threadState {
     READY,
@@ -120,6 +118,36 @@ struct threadQueue readyQueue;
 struct threadQueue blockedQueue;
 
 thread_s* currentThread;
+
+#ifdef USE_STACK_PROT
+#include <unistd.h>
+
+static void segfault_handler(int sig, siginfo_t *si, void *unused) {
+    (void)sig;
+    (void)unused;
+    //we check if the fault address is near the current thread's stack
+    fprintf(stderr, "\n[Stack Guard] Segm fault at address %p\n", si->si_addr);
+    fprintf(stderr, "[Stack Guard] Stack overflow detected in thread %p\n", (void*)currentThread);
+    exit(EXIT_FAILURE); 
+}
+
+void setup_stack_protection() {
+    //emergency stack for signal handling
+    stack_t ss;
+    ss.ss_sp = malloc(SIGSTKSZ);
+    ss.ss_size = SIGSTKSZ;
+    ss.ss_flags = 0;
+    if (sigaltstack(&ss, NULL) == -1) {
+        perror("sigaltstack");
+    }
+    //to catch stack overflows
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK; 
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = segfault_handler;
+    sigaction(SIGSEGV, &sa, NULL);
+}
+#endif
 
 int init_done = 0;
 
@@ -208,6 +236,10 @@ void thread_init() {
     TAILQ_INIT(&readyQueue);
     TAILQ_INIT(&blockedQueue);
 
+    #ifdef USE_STACK_PROT
+    setup_stack_protection();
+    #endif
+
     currentThread = &mainThread;
 
     currentThread->state = RUNNING;
@@ -262,8 +294,14 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
         lock_preemption();
     #endif
 
-    void *block = malloc(THREAD_ALLOC_SIZE + SizeStack);
-    if (block == NULL) {
+    void *block = NULL;
+
+    #ifdef USE_STACK_PROT
+    size_t page_size = sysconf(_SC_PAGESIZE);
+    size_t struct_size_aligned = (THREAD_ALLOC_SIZE + page_size - 1) & ~(page_size - 1);
+    size_t total_len = struct_size_aligned + page_size + SizeStack;
+    
+    if (posix_memalign(&block, page_size, total_len) != 0) {
         #ifdef USE_PREEM
             unlock_preemption();
         #endif
@@ -271,7 +309,32 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
     }
 
     thread_s *newThread = (thread_s *)block;
+    //our guard page is the page right after the thread_s structure
+    void *guard_page = (char *)block + struct_size_aligned;
+    newThread->stack = (char *)guard_page + page_size;
+
+    //no access flag to the guard patch
+    if (mprotect(guard_page, page_size, PROT_NONE) == -1) {
+        perror("mprotect");
+        free(block);
+        #ifdef USE_PREEM
+            unlock_preemption();
+        #endif
+        return -1;
+    }
+    #else
+    block = malloc(THREAD_ALLOC_SIZE + SizeStack);
+    if (block == NULL) {
+        #ifdef USE_PREEM
+            unlock_preemption();
+        #endif
+        return -1;
+    }
+    thread_s *newThread = (thread_s *)block;
     newThread->stack = (char *)block + THREAD_ALLOC_SIZE; // les deux blocs sont contigues, on reduit le nombre de malloc et de free necesssaire
+    #endif
+
+
     newThread->valgrind_stackid = VALGRIND_STACK_REGISTER(newThread->stack,
                                                newThread->stack + SizeStack);
 
@@ -449,6 +512,11 @@ int thread_join(thread_t thread, void **retval){
 
     if (targetThread != &mainThread) {
         VALGRIND_STACK_DEREGISTER(targetThread->valgrind_stackid);
+        #ifdef USE_STACK_PROT
+        //reset permissions
+        size_t page_size = sysconf(_SC_PAGESIZE);
+        mprotect((char*)targetThread + THREAD_ALLOC_SIZE, page_size, PROT_READ | PROT_WRITE);
+        #endif
         free(targetThread);
     }
     #ifdef USE_PREEM

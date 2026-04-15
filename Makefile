@@ -79,13 +79,26 @@ graphs: install
 	mkdir -p results
 	python3 scripts/plot.py
 
-install: build_tests pthreads context preem
+install: build_tests pthreads context preem stackprot
 
 rapport:
 	pdflatex rapport/rapport.tex
+
+#lib with stack prot support
+install/lib/libthread-stackprot.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_STACK_PROT -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
+#compile all tests with stack prot
+stackprot: install/lib/libthread-stackprot.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) -DUSE_STACK_PROT $$t install/lib/libthread-stackprot.a -o install/bin/$$(basename $$t .c)-stackprot || true; \
+	done
 
 clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
 
-.PHONY: all clean graphs check valgrind install build_tests pthreads context preem all rapport
+.PHONY: all clean graphs check valgrind install build_tests pthreads context preem all rapport stackprot
