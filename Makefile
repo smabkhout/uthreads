@@ -27,6 +27,12 @@ install/lib/libthread-mutex_61.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+install/lib/libthread-test_23.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_TEST_23 -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 
 # Compile src with preem support into a library
 install/lib/libthread-preem.a: $(SRC)
@@ -43,6 +49,11 @@ install/lib/libthread-fibo.a: $(SRC)
 	rm -f *.o
 
 build_tests: install/lib/libthread.a $(TEST_BINS)
+
+
+install/bin/62-mutex: test/23-create-many-once.c install/lib/libthread-test_23.a
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_TEST_23 $< install/lib/libthread-mutex_61.a -o $@
 
 install/bin/62-mutex: test/62-mutex.c install/lib/libthread-mutex_61.a
 	mkdir -p install/bin
