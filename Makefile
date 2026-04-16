@@ -51,7 +51,7 @@ install/lib/libthread-fibo.a: $(SRC)
 build_tests: install/lib/libthread.a $(TEST_BINS)
 
 
-install/bin/62-mutex: test/23-create-many-once.c install/lib/libthread-test_23.a
+install/bin/23-create-many-once: test/23-create-many-once.c install/lib/libthread-test_23.a
 	mkdir -p install/bin
 	$(CC) $(CFLAGS) -DUSE_TEST_23 $< install/lib/libthread-mutex_61.a -o $@
 
