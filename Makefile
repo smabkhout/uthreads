@@ -53,7 +53,7 @@ build_tests: install/lib/libthread.a $(TEST_BINS)
 
 install/bin/23-create-many-once: test/23-create-many-once.c install/lib/libthread-test_23.a
 	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DUSE_TEST_23 $< install/lib/libthread-mutex_61.a -o $@
+	$(CC) $(CFLAGS) -DUSE_TEST_23 $< install/lib/libthread-test_23.a -o $@
 
 install/bin/62-mutex: test/62-mutex.c install/lib/libthread-mutex_61.a
 	mkdir -p install/bin
