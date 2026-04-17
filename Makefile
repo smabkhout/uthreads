@@ -122,6 +122,9 @@ install: build_tests pthreads context preem stackprot
 rapport:
 	pdflatex rapport/rapport.tex
 
+rapport-final:
+	pdflatex rapport-final/rapport-final.tex
+
 #lib with stack prot support
 install/lib/libthread-stackprot.a: $(SRC)
 	mkdir -p install/lib
@@ -139,4 +142,4 @@ clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
 
-.PHONY: all clean graphs check valgrind install build_tests pthreads context preem all rapport stackprot
+.PHONY: all clean graphs check valgrind install build_tests pthreads context preem all rapport stackprot rapport-final
