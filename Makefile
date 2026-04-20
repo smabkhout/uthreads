@@ -21,19 +21,6 @@ install/lib/libthread-context.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
-install/lib/libthread-mutex_61.a: $(SRC)
-	mkdir -p install/lib
-	$(CC) $(CFLAGS) -DUSE_MUTEX_61 -c $(SRC)
-	ar rcs $@ *.o
-	rm -f *.o
-
-install/lib/libthread-test_23.a: $(SRC)
-	mkdir -p install/lib
-	$(CC) $(CFLAGS) -DUSE_TEST_23 -c $(SRC)
-	ar rcs $@ *.o
-	rm -f *.o
-
-
 # Compile src with preem support into a library
 install/lib/libthread-preem.a: $(SRC)
 	mkdir -p install/lib
@@ -51,17 +38,6 @@ install/lib/libthread-fibo.a: $(SRC)
 build_tests: install/lib/libthread.a $(TEST_BINS)
 
 
-install/bin/23-create-many-once: test/23-create-many-once.c install/lib/libthread-test_23.a
-	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DUSE_TEST_23 $< install/lib/libthread-test_23.a -o $@
-
-install/bin/62-mutex: test/62-mutex.c install/lib/libthread-mutex_61.a
-	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DUSE_MUTEX_61 $< install/lib/libthread-mutex_61.a -o $@
-
-install/bin/61-mutex: test/61-mutex.c install/lib/libthread-mutex_61.a
-	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DUSE_MUTEX_61 $< install/lib/libthread-mutex_61.a -o $@
 
 # on triche en activant la preemption uniquement sur sontest parce que ... pourquoi pas? hhhh
 install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
@@ -69,9 +45,9 @@ install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
 	$(CC) $(CFLAGS) -DUSE_PREEM $< install/lib/libthread-preem.a -o $@
 
 # on triche dans le test de fibo aussi parce que ... pourquoi pas? hhhh
-install/bin/51-fibonacci: test/51-fibonacci.c install/lib/libthread-fibo.a
-	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DTRICHER_FIBO $< install/lib/libthread-fibo.a -o $@
+#install/bin/51-fibonacci: test/51-fibonacci.c install/lib/libthread-fibo.a
+#	mkdir -p install/bin
+#	$(CC) $(CFLAGS) -DTRICHER_FIBO $< install/lib/libthread-fibo.a -o $@
 
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a

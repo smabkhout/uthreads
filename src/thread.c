@@ -289,10 +289,6 @@ static void thread_wrapper(void) {
 }
 
 int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
-#ifdef USE_TEST_23
-  *createdThread = (thread_t)0x1;
-  return 0;
-#endif
   if (currentThread == NULL) {
     thread_init();
   }
@@ -448,13 +444,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 }
 
 int thread_yield() {
-#ifdef USE_MUTEX_61
-
-  if (currentThread->state == RUNNING && currentThread != &mainThread) {
-    return 0;
-  }
-#endif
-
+  
 #ifdef USE_PREEM
   lock_preemption();
 #endif
