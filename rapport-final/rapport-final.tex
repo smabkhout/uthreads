@@ -1,39 +1,52 @@
-\documentclass[12pt,a4paper]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[french]{babel}
-\usepackage{geometry}
-\geometry{margin=2cm}
-\usepackage{booktabs}
-\usepackage{graphicx}
-\usepackage{array}
-\begin{document}
+\documentclass[12pt, a4paper] { article }
+\usepackage[utf8] { inputenc }
+\usepackage[french] { babel }
+\usepackage { geometry }
+\geometry{margin = 2cm}
+\usepackage { booktabs }
+\usepackage { graphicx }
+\usepackage { array }
+\begin { document }
 
-\begin{titlepage}
-    \centering
-    \vspace*{1cm}
+\begin { titlepage }
+\centering
+    \vspace *{1cm}
+
+{
+  \Huge \textbf { Rapport final : \\ Threads en espace utilisateur }
+}
+\\[0.5cm] {\Large Projet Système }
+\\[1.5cm]
+
+    \includegraphics[width = 0.4\textwidth] {
+  rapport / images / enseirb.png
+}
+\\[2cm]
+
+    \textbf {
+Auteurs:
+}
+\ MABKHOUT Salah - Eddine \ MIGAOU Mohamed Aziz \\ 
+    BENBAKI Anas \ DAMMOU Adam \\[1.5cm]
+
+    \textbf {
+Date:
+}
+\today \\[2cm]
     
-    {\Huge \textbf{Rapport final : \\ Threads en espace utilisateur}} \\[0.5cm]
-    {\Large Projet Système} \\[1.5cm]
+    \LARGE \textbf {
+  ENSEIRB - MATMECA
+}
+\\[1.5cm]
 
-    \includegraphics[width=0.4\textwidth]{rapport/images/enseirb.png} \\[2cm]
+    \vfill{\large Année 2025 - 2026}
+\end {
+  titlepage
+}
 
-    \textbf{Auteurs :} \\
-    MABKHOUT Salah-Eddine \\
-    MIGAOU Mohamed Aziz \\ 
-    BENBAKI Anas \\
-    DAMMOU Adam \\[1.5cm]
+\input { rapport - final / chapters / part_anas.tex }
+\input { rapport - final / chapters / part_adam.tex }
+\input { rapport - final / chapters / part_aziz.tex }
+\input { rapport - final / chapters / part_salah.tex }
 
-    \textbf{Date :} \today \\[2cm]
-    
-    \LARGE \textbf{ENSEIRB-MATMECA} \\[1.5cm]
-
-    \vfill
-    {\large Année 2025-2026}
-\end{titlepage}
-
-\input{rapport-final/chapters/part_anas.tex}
-\input{rapport-final/chapters/part_adam.tex}
-\input{rapport-final/chapters/part_aziz.tex}
-\input{rapport-final/chapters/part_salah.tex}
-
-\end{document}
+\end { document }
