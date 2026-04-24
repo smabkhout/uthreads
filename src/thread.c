@@ -444,7 +444,7 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 }
 
 int thread_yield() {
-  
+
 #ifdef USE_PREEM
   lock_preemption();
 #endif
