@@ -114,6 +114,11 @@ stackprot: install/lib/libthread-stackprot.a $(TESTS)
 		$(CC) $(CFLAGS) -DUSE_STACK_PROT $$t install/lib/libthread-stackprot.a -o install/bin/$$(basename $$t .c)-stackprot || true; \
 	done
 
+signals: install/lib/libthread-context.a test/91-signals.c
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_CONTEXT test/91-signals.c install/lib/libthread-context.a -o install/bin/91-signals
+	./install/bin/91-signals
+
 clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
