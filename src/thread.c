@@ -103,6 +103,7 @@ struct thread_s {
   TAILQ_ENTRY(thread_s)
   entries; // reference au thread suivant et thread precedent
   volatile int signals_blocked;
+  int priority;
 #ifdef TRICHER_FIBO
   int recursive_create_count; // nombre de thread_create recursifs (meme func)
                               // faits par ce thread pour fibp
@@ -221,6 +222,22 @@ void start_preemption() {
   setitimer(ITIMER_VIRTUAL, &it, NULL);
 }
 #endif
+
+static void enqueue_ready(thread_s *t) {
+  #ifdef USE_PRIORITY
+      thread_s *iter;
+      
+      TAILQ_FOREACH(iter, &readyQueue, entries) {
+          if (t->priority < iter->priority) {
+              TAILQ_INSERT_BEFORE(iter, t, entries);
+              return;
+          }
+      }
+      TAILQ_INSERT_TAIL(&readyQueue, t, entries);
+  #else
+      TAILQ_INSERT_TAIL(&readyQueue, t, entries);
+  #endif
+  }
 
 // longjmp effectue un demangle donc il faut lui doner l'addresse brouille pas
 // en clair
@@ -416,6 +433,8 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
   newThread->joiningThread = NULL;
   newThread->func = func;
   newThread->arg = arg;
+  newThread->priority = 10;
+  
 
 #ifdef TRICHER_FIBO
   newThread->recursive_create_count = 0;
@@ -502,8 +521,8 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
   *createdThread = (thread_t)newThread;
 
-  TAILQ_INSERT_TAIL(&readyQueue, newThread, entries);
-#ifdef USE_PREEM
+  enqueue_ready(newThread);
+  #ifdef USE_PREEM
   unlock_preemption();
 #endif
   return 0;
@@ -527,7 +546,7 @@ int thread_yield() {
 
   if (oldThread->state == RUNNING) {
     oldThread->state = READY;
-    TAILQ_INSERT_TAIL(&readyQueue, oldThread, entries);
+    enqueue_ready(oldThread);
   }
   nextThread->state = RUNNING;
 
@@ -716,7 +735,7 @@ int thread_mutex_unlock(thread_mutex_t *m) {
     thread_s *myTurnThread = TAILQ_FIRST((struct mutexQueue *)m->waitingQueue);
     TAILQ_REMOVE((struct mutexQueue *)m->waitingQueue, myTurnThread, entries);
     myTurnThread->state = READY;
-    TAILQ_INSERT_TAIL(&readyQueue, myTurnThread, entries);
+    enqueue_ready(myTurnThread);
   }
 #ifdef USE_PREEM
   unlock_preemption();
