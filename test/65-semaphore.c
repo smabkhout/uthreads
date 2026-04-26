@@ -46,3 +46,7 @@
 //     printf("Temps d'exécution: %ld us\n", us);
 //     return 0;
 // }
+
+int main() {
+    return 0;
+}
