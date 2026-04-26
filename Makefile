@@ -21,6 +21,13 @@ install/lib/libthread-context.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+# Compile src with priority support into a library
+install/lib/libthread-priority.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_PRIORITY -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 # Compile src with preem support into a library
 install/lib/libthread-preem.a: $(SRC)
 	mkdir -p install/lib
@@ -62,6 +69,11 @@ pthreads: $(TESTS)
 context: install/lib/libthread-context.a $(TESTS)
 	@for t in $(TESTS); do \
 		$(CC) $(CFLAGS) -DUSE_CONTEXT $$t install/lib/libthread-context.a -o install/bin/$$(basename $$t .c)-context || true; \
+	done
+
+priority: install/lib/libthread-priority.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) -DUSE_PRIORITY $$t install/lib/libthread-priority.a -o install/bin/$$(basename $$t .c)-priority || true; \
 	done
 
 preem: install/lib/libthread-preem.a $(TESTS)

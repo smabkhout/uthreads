@@ -554,6 +554,14 @@ int thread_yield() {
 #ifdef USE_PREEM
   lock_preemption();
 #endif
+#ifdef USE_PRIORITY
+thread_s *it;
+TAILQ_FOREACH(it, &readyQueue, entries) {
+    if (it->priority > 0) {
+        it->priority--;
+    }
+}
+#endif
   thread_s *oldThread = currentThread;
   // cas si il y a personne d'autre
   if (init_done == 0 || TAILQ_EMPTY(&readyQueue)) {
@@ -567,6 +575,7 @@ int thread_yield() {
 
   if (oldThread->state == RUNNING) {
     oldThread->state = READY;
+    oldThread->priority = 10;
     enqueue_ready(oldThread);
   }
   nextThread->state = RUNNING;
