@@ -339,6 +339,27 @@ thread_sighandler_t thread_signal(int sig, thread_sighandler_t handler) {
   return old;
 }
 
+
+
+
+
+int thread_sigwait(uint32_t set, int *signo) {
+  while (!(currentThread->pending_signals & set)) {
+    currentThread->sigwait_mask = set;
+    currentThread->state = BLOCKED;
+    TAILQ_INSERT_TAIL(&blockedQueue, currentThread, entries);
+    thread_yield();
+  }
+  uint32_t pending = currentThread->pending_signals & set;
+  int sig = 0;
+  while (!((pending >> sig) & 1))
+    sig++;
+  currentThread->pending_signals &= ~((uint32_t)1 << sig);
+  currentThread->sigwait_mask = 0;
+  if (signo)
+    *signo = sig;
+  return 0;
+}
 #endif
 
 static void thread_wrapper(void) {
