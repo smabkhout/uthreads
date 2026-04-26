@@ -1,6 +1,6 @@
 # Bibliotheque de Threads Utilisateur (User-Level Threads)
 
-Ce projet propose l'implementation complete d'une bibliotheque de gestion de threads en C. Elle permet la creation, l'ordonnancement, la synchronisation et la destruction de threads legers. 
+Ce projet propose l'implementation complete d'une bibliotheque de gestion de threads en C. Elle permet la creation, l'ordonnancement, et la destruction de threads legers. 
 
 Outre les fonctionnalites de base, ce projet integre plusieurs objectifs avances, activables via des options de compilation : l'usage de setjmp/longjmp, gestion de priorite, ordonnancement preemptif, protection contre les depassements de pile, et gestion des signaux.
 
@@ -9,17 +9,19 @@ Outre les fonctionnalites de base, ce projet integre plusieurs objectifs avances
 
 Le projet suit une arborescence suivante :
 
+```
 .
-├── src/            # Code source de la bibliotheque 
-├── test/           # Fichiers de test 
+├── src/            # Code source de la bibliotheque
+├── test/           # Fichiers de test
 ├── install/        # Genere automatiquement a la compilation
-│   ├── lib/        # Bibliotheques statiques compilees 
+│   ├── lib/        # Bibliotheques statiques compilees
 │   └── bin/        # Executables de tests compiles
 ├── scripts/        # Scripts annexes (ex: plot.py pour les graphes)
-├── rapport/        # Fichiers source LaTeX pour le rapport intermédiaire
+├── rapport/        # Fichiers source LaTeX pour le rapport intermediaire
 ├── rapport-final/  # Fichiers source LaTeX pour le rapport final
 ├── Makefile        # Fichier de regles de compilation
-└── README.md       
+└── README.md
+```
 
 
 ## Compilation et Options Avancees
