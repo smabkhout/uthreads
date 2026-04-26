@@ -16,7 +16,8 @@ Le projet suit une arborescence suivante :
 │   ├── lib/        # Bibliotheques statiques compilees 
 │   └── bin/        # Executables de tests compiles
 ├── scripts/        # Scripts annexes (ex: plot.py pour les graphes)
-├── rapport/        # Fichiers source LaTeX pour le rapport
+├── rapport/        # Fichiers source LaTeX pour le rapport intermédiaire
+├── rapport-final/  # Fichiers source LaTeX pour le rapport final
 ├── Makefile        # Fichier de regles de compilation
 └── README.md       
 
