@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include "../src/thread.h"
+#include "thread.h"
 
 thread_sem_t sem;
 int counter = 0;
