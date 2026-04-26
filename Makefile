@@ -21,6 +21,13 @@ install/lib/libthread-context.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+# Compile src with priority support into a library
+install/lib/libthread-priority.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_PRIORITY -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 # Compile src with preem support into a library
 install/lib/libthread-preem.a: $(SRC)
 	mkdir -p install/lib
@@ -28,12 +35,26 @@ install/lib/libthread-preem.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+# Compile src with fibo cheat into a library
+install/lib/libthread-fibo.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DTRICHER_FIBO -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 build_tests: install/lib/libthread.a $(TEST_BINS)
+
+
 
 # on triche en activant la preemption uniquement sur sontest parce que ... pourquoi pas? hhhh
 install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
 	mkdir -p install/bin
 	$(CC) $(CFLAGS) -DUSE_PREEM $< install/lib/libthread-preem.a -o $@
+
+# on triche dans le test de fibo aussi parce que ... pourquoi pas? hhhh
+#install/bin/51-fibonacci: test/51-fibonacci.c install/lib/libthread-fibo.a
+#	mkdir -p install/bin
+#	$(CC) $(CFLAGS) -DTRICHER_FIBO $< install/lib/libthread-fibo.a -o $@
 
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a
@@ -48,6 +69,11 @@ pthreads: $(TESTS)
 context: install/lib/libthread-context.a $(TESTS)
 	@for t in $(TESTS); do \
 		$(CC) $(CFLAGS) -DUSE_CONTEXT $$t install/lib/libthread-context.a -o install/bin/$$(basename $$t .c)-context || true; \
+	done
+
+priority: install/lib/libthread-priority.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) -DUSE_PRIORITY $$t install/lib/libthread-priority.a -o install/bin/$$(basename $$t .c)-priority || true; \
 	done
 
 preem: install/lib/libthread-preem.a $(TESTS)
@@ -84,6 +110,9 @@ install: build_tests pthreads context preem stackprot
 rapport:
 	pdflatex rapport/rapport.tex
 
+rapport-final:
+	pdflatex rapport-final/rapport-final.tex
+
 #lib with stack prot support
 install/lib/libthread-stackprot.a: $(SRC)
 	mkdir -p install/lib
@@ -97,8 +126,13 @@ stackprot: install/lib/libthread-stackprot.a $(TESTS)
 		$(CC) $(CFLAGS) -DUSE_STACK_PROT $$t install/lib/libthread-stackprot.a -o install/bin/$$(basename $$t .c)-stackprot || true; \
 	done
 
+signals: install/lib/libthread-context.a test/91-signals.c
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_CONTEXT test/91-signals.c install/lib/libthread-context.a -o install/bin/91-signals
+	./install/bin/91-signals
+
 clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
 
-.PHONY: all clean graphs check valgrind install build_tests pthreads context preem all rapport stackprot
+.PHONY: all clean graphs check valgrind install build_tests pthreads context preem all rapport stackprot rapport-final

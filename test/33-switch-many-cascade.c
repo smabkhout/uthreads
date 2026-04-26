@@ -1,13 +1,15 @@
-#include <stdio.h>
+#include "../src/thread.h"
 #include <assert.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <stdint.h>
-#include "../src/thread.h"
 
-/* test une chaine de thread avec un nombre decroissants de switch quand on descend dans la chaine.
+/* test une chaine de thread avec un nombre decroissants de switch quand on
+ * descend dans la chaine.
  *
- * La durée du programme doit etre proportionnelle au nombre de total de yields = ( nbyield * nbthread * (nbthread+1) / 2 ) donnés en argument
+ * La durée du programme doit etre proportionnelle au nombre de total de yields
+ * = ( nbyield * nbthread * (nbthread+1) / 2 ) donnés en argument
  *
  * support nécessaire:
  * - thread_create()
@@ -19,61 +21,58 @@
 static int nbyield;
 static int nbthread;
 
-static void * thfunc(void *_nbth)
-{
-    int nbth = (intptr_t) _nbth;
-    int i;
+static void *thfunc(void *_nbth) {
+  int nbth = (intptr_t)_nbth;
+  int i;
 
-    if ((unsigned long) nbth > 0) {
-        thread_t th;
-        int err;
-        void *res;
-        err = thread_create(&th, thfunc, ((char*)_nbth)-1);
-        assert(!err);
+  if ((unsigned long)nbth > 0) {
+    thread_t th;
+    int err;
+    void *res;
+    err = thread_create(&th, thfunc, ((char *)_nbth) - 1);
+    assert(!err);
 
-        for(i=0; i<(nbyield*nbth); i++) {
-            // printf("je suis le th %p \n" ,thread_self());
-            thread_yield();
-        }
-
-        err = thread_join(th, &res);
-        printf("l addresse de th: %p\n", &th);
-        assert(!err);
-        assert(res == ((char*)_nbth)-1);
+    for (i = 0; i < (nbyield * nbth); i++) {
+      // printf("je suis le th %p \n" ,thread_self());
+      thread_yield();
     }
-    else {
-        for(i=0; i<(nbyield*nbthread); i++) {
-            // printf("je suis le th %p dasn else \n" ,thread_self());
 
-            thread_yield();
-        }
+    err = thread_join(th, &res);
+    printf("l addresse de th: %p\n", &th);
+    assert(!err);
+    assert(res == ((char *)_nbth) - 1);
+  } else {
+    for (i = 0; i < (nbyield * nbthread); i++) {
+      // printf("je suis le th %p dasn else \n" ,thread_self());
+
+      thread_yield();
     }
-    return _nbth;
+  }
+  return _nbth;
 }
 
-int main(int argc, char *argv[])
-{
-    struct timeval tv1, tv2;
-    unsigned long us;
-    unsigned long nbth;
+int main(int argc, char *argv[]) {
+  struct timeval tv1, tv2;
+  unsigned long us;
+  unsigned long nbth;
 
-    if (argc < 3) {
-        printf("arguments manquants: nombre de threads, puis nombre de yield\n");
-        return EXIT_FAILURE;
-    }
+  if (argc < 3) {
+    printf("arguments manquants: nombre de threads, puis nombre de yield\n");
+    return EXIT_FAILURE;
+  }
 
-    nbthread = atoi(argv[1]);
-    nbth = nbthread;
-    nbyield = atoi(argv[2]);
+  nbthread = atoi(argv[1]);
+  nbth = nbthread;
+  nbyield = atoi(argv[2]);
 
-    gettimeofday(&tv1, NULL);
-    thfunc((void*) nbth);
-    gettimeofday(&tv2, NULL);
+  gettimeofday(&tv1, NULL);
+  thfunc((void *)nbth);
+  gettimeofday(&tv2, NULL);
 
-    us = (tv2.tv_sec-tv1.tv_sec)*1000000+(tv2.tv_usec-tv1.tv_usec);
-    printf("%d yield avec plein de threads dans join: %ld us\n", nbyield, us);
+  us = (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+  printf("%d yield avec plein de threads dans join: %ld us\n", nbyield, us);
 
-    printf("%ld threads créés et détruits\n", nbth);
-    printf("GRAPH;33;%ld;%d;%lu\n", nbth, nbyield, us);
-    return 0;
+  printf("%ld threads créés et détruits\n", nbth);
+  printf("GRAPH;33;%ld;%d;%lu\n", nbth, nbyield, us);
+  return 0;
 }
