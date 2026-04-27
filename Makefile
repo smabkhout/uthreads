@@ -46,6 +46,10 @@ build_tests: install/lib/libthread.a $(TEST_BINS)
 
 
 
+install/bin/91-signals: test/91-signals.c install/lib/libthread-context.a
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_CONTEXT $< install/lib/libthread-context.a -o $@
+
 # on triche en activant la preemption uniquement sur sontest parce que ... pourquoi pas? hhhh
 install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
 	mkdir -p install/bin
