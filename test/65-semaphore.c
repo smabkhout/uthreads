@@ -5,6 +5,9 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include "thread.h"
+
+#ifdef USE_SEM
+
 thread_sem_t sem;
 int counter = 0;
 void * worker(void *arg) {
@@ -37,3 +40,9 @@ int main(int argc, char *argv[]) {
     printf("Temps d'exécution: %ld us\n", us);
     return 0;
 }
+#else
+int main(void) {
+  printf("signals: ignore sans -DUSE_SEM\n");
+  return EXIT_SUCCESS;
+}
+#endif
