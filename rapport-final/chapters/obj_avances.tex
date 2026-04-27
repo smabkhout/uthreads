@@ -1,10 +1,11 @@
-\section{Signaux inter-threads en espace utilisateur}
+\section{Objectifs Avancés} 
+\subsection{Signaux inter-threads en espace utilisateur}
 
 Nous avons ajouté un mécanisme de signaux inter-threads en espace utilisateur,
 sans signaux système POSIX, pour éviter les interférences avec \texttt{SIGVTALRM}
 déjà utilisé par la préemption.
 
-\subsection{Implémentation}
+\subsubsection{Implémentation}
 
 Les signaux sont représentés par un masque de bits \texttt{uint32\_t}. Trois
 champs ont été ajoutés à \texttt{thread\_s} : \texttt{pending\_signals} (signaux
@@ -28,7 +29,7 @@ Trois fonctions sont disponibles en mode \texttt{USE\_CONTEXT} :
 La livraison est coopérative : \texttt{deliver\_pending\_signals()} est appelée
 dans \texttt{thread\_yield} et au démarrage de chaque thread.
 
-\subsection{Test : \texttt{91-signals.c}}
+\subsubsection{Test : \texttt{91-signals.c}}
 
 Le test couvre trois scénarios : sigwait bloquant (un thread attend, un autre
 envoie), livraison via handler après un yield, et signal déjà en attente au
