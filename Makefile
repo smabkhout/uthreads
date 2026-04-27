@@ -5,7 +5,7 @@ SRC=$(wildcard src/*.c)
 TESTS=$(wildcard test/*.c)
 TEST_BINS=$(patsubst test/%.c,install/bin/%,$(TESTS))
 
-all: build_tests
+all: install
 
 # Compile src into a library in install/lib
 install/lib/libthread.a: $(SRC)
@@ -145,7 +145,7 @@ graphs: install
 	mkdir -p results
 	python3 scripts/plot.py
 
-install: build_tests pthreads context preem stackprot
+install: build_tests pthreads context preem stackprot one-malloc recycle one-malloc-recycle
 
 rapport:
 	pdflatex rapport/rapport.tex
