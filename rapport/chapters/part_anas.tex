@@ -1,63 +1,47 @@
-\section { Avancement et Architecture Technique }
+\section{Avancement et Architecture Technique}
 
-\subsection { Structure et Interface de Base(thread.h) }
-L'ensemble de l' interface de gestion de threads a été implémentée.
+\subsection{Structure et Interface de Base (thread.h)}
+L'ensemble de l'interface de gestion de threads a été implémentée.
 
-    Tous les tests fournis passent à l'exception du test 71 (préemption, non implémentée).
+Tous les tests fournis passent à l'exception du test 71 (préemption, non implémentée).
 
-\subsubsection *{Structure Fondamentale} La structure \texttt{
-        thread\_s} centralise toutes les informations :
-\begin {
-  itemize
-}
-\item Contexte d'exécution: (\texttt{ucontext\_t} OU \texttt{jmp\_buf})
-    \item Pile associée au thread(8 Ko)
-    \item État(\texttt{READY / RUNNING / BLOCKED / TERMINATED})
-    \item Valeur de retour(\texttt{void * retval})
-    \item Thread en attente(\texttt{joiningThread})
-    \item Liaison(\texttt{TAILQ\_ENTRY}) pour ordonnancement
-\end{itemize} Nous avons retenu les \textit{TAILQ} de la bibliothéque \textit{
-    OpenBSD} car ils permettent un
-    ordonnancement FIFO efficace et de supprimer n'importe quel thread en $O(1)$, ce qui nous évitera des parcours linéaires qui vont affecter les performances.
+\subsubsection*{Structure Fondamentale}
+La structure \texttt{thread\_s} centralise toutes les informations :
+\begin{itemize}
+    \item Contexte d'exécution : (\texttt{ucontext\_t} OU \texttt{jmp\_buf})
+    \item Pile associée au thread (8 Ko)
+    \item État (\texttt{READY / RUNNING / BLOCKED / TERMINATED})
+    \item Valeur de retour (\texttt{void *retval})
+    \item Thread en attente (\texttt{joiningThread})
+    \item Liaison (\texttt{TAILQ\_ENTRY}) pour ordonnancement
+\end{itemize}
+Nous avons retenu les \textit{TAILQ} de la bibliothèque \textit{OpenBSD} car
+ils permettent un ordonnancement FIFO efficace et de supprimer n'importe quel
+thread en $O(1)$, ce qui nous évitera des parcours linéaires qui vont affecter
+les performances.
 
-\subsection{Outils de Compilation et Tests} Le \texttt{
-        Makefile} supporte les cibles suivantes :
-\begin {
-  itemize
-}
-\item \texttt{make} : compile la bibliothèque + tests
+\subsection{Outils de Compilation et Tests}
+Le \texttt{Makefile} supporte les cibles suivantes :
+\begin{itemize}
+    \item \texttt{make} : compile la bibliothèque + tests
     \item \texttt{make check} : exécution de l'ensemble des tests
-    \item \texttt{make valgrind} : analyse les fuites
-                                    mémoire(0 leaks confirmés)
+    \item \texttt{make valgrind} : analyse les fuites mémoire (0 leaks confirmés)
     \item \texttt{make pthreads} : utilise l'implémentation de la libc pour les comparaisons
-    \item \texttt{make install} : installation arborescence \texttt {
-  install /
-}
-\item \texttt{make graphs}
-    : génération des graphes en faisant varier le nombre de threads
-\end {
-  itemize
-}
+    \item \texttt{make install} : installation arborescence \texttt{install/}
+    \item \texttt{make graphs} : génération des graphes en faisant varier le nombre de threads
+\end{itemize}
 
-\subsection{Mutex} Nous avons opté pour une implémentation simple mais efficace
-    pour les mutex :
-\begin {
-  itemize
-}
-\item Structure : un entier (1 ou 0) + file d'attente \texttt{TAILQ} qui contient l'ensemble des threads qui attendent le déverouillage de ce mutex.
-    \item Fonctions : \texttt{init()}, \texttt{destroy()}, \texttt{lock()}, \texttt{
-  unlock()
-}
-\end { itemize }
+\subsection{Mutex}
+Nous avons opté pour une implémentation simple mais efficace pour les mutex :
+\begin{itemize}
+    \item Structure : un entier (1 ou 0) + file d'attente \texttt{TAILQ} qui
+    contient l'ensemble des threads qui attendent le déverrouillage de ce mutex.
+    \item Fonctions : \texttt{init()}, \texttt{destroy()}, \texttt{lock()}, \texttt{unlock()}
+\end{itemize}
 
-\subsection { Ordonnancement Coopératif }
-\begin { itemize }
-\item \texttt{readyQueue}(\texttt{TAILQ})
-    : threads prêts à s'exécuter (FIFO)
-    \item \texttt{blockedQueue}(\texttt{TAILQ})
-    : threads en attente(\texttt{join})
-    \item \texttt{currentThread}
-    : variable global pointant vers le thread courant
-\end {
-  itemize
-}
+\subsection{Ordonnancement Coopératif}
+\begin{itemize}
+    \item \texttt{readyQueue} (\texttt{TAILQ}) : threads prêts à s'exécuter (FIFO)
+    \item \texttt{blockedQueue} (\texttt{TAILQ}) : threads en attente (\texttt{join})
+    \item \texttt{currentThread} : variable globale pointant vers le thread courant
+\end{itemize}

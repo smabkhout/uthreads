@@ -361,7 +361,7 @@ thread_sighandler_t thread_signal(int sig, thread_sighandler_t handler) {
 
 
 int thread_sigwait(uint32_t set, int *signo) {
-  while (!(currentThread->pending_signals & set)) {
+  while (!(currentThread->pending_signals & set)) { // si aucun des signaux qu'on attend n'est arrivé encore
     currentThread->sigwait_mask = set;
     currentThread->state = BLOCKED;
     TAILQ_INSERT_TAIL(&blockedQueue, currentThread, entries);
@@ -369,12 +369,10 @@ int thread_sigwait(uint32_t set, int *signo) {
   }
   uint32_t pending = currentThread->pending_signals & set;
   int sig = 0;
-  while (!((pending >> sig) & 1))
-    sig++;
+  while (!((pending >> sig) & 1)) sig++;
   currentThread->pending_signals &= ~((uint32_t)1 << sig);
   currentThread->sigwait_mask = 0;
-  if (signo)
-    *signo = sig;
+  if (signo) *signo = sig;
   return 0;
 }
 #endif
