@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define USE_CONTEXT
+
 #ifndef USE_CONTEXT
 int main(void) {
   printf("signals: ignore sans -DUSE_CONTEXT\n");
@@ -19,13 +21,6 @@ int main(void) {
  *   - un handler enregistre est appele apres thread_kill suivi d'un yield
  *   - un signal envoye avant l'appel a thread_sigwait est consomme immediatement
  *
- * support necessaire:
- * - thread_create()
- * - thread_join()
- * - thread_yield()
- * - thread_kill()
- * - thread_signal()
- * - thread_sigwait()
  */
 
 #define SIG_A 3
@@ -86,32 +81,24 @@ static void *early_sender(void *arg __attribute__((unused))) {
 
 int main(void) {
   void *retval;
+  thread_t s, t;
 
   /* sigwait bloque jusqu'a reception du signal */
-  {
-    thread_t s;
-    thread_create(&g_receiver, receiver, NULL);
-    thread_create(&s, sender, NULL);
-    thread_join(s, NULL);
-    thread_join(g_receiver, &retval);
-    assert((long)retval == 42L);
-  }
+  thread_create(&g_receiver, receiver, NULL);
+  thread_create(&s, sender, NULL);
+  thread_join(s, NULL);
+  thread_join(g_receiver, &retval);
+  assert((long)retval == 42L);
 
   /* handler appele apres kill + yield */
-  {
-    thread_t t;
-    thread_create(&t, handler_thread, NULL);
-    thread_join(t, NULL);
-  }
+  thread_create(&t, handler_thread, NULL);
+  thread_join(t, NULL);
 
   /* signal deja pending quand sigwait est appele */
-  {
-    thread_t s;
-    thread_create(&g_early_receiver, early_receiver, NULL);
-    thread_create(&s, early_sender, NULL);
-    thread_join(s, NULL);
-    thread_join(g_early_receiver, NULL);
-  }
+  thread_create(&g_early_receiver, early_receiver, NULL);
+  thread_create(&s, early_sender, NULL);
+  thread_join(s, NULL);
+  thread_join(g_early_receiver, NULL);
 
   printf("signals OK\n");
   return EXIT_SUCCESS;
