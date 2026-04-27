@@ -731,42 +731,177 @@ int thread_mutex_destroy(thread_mutex_t *m) {
   return 0;
 }
 
-int thread_mutex_lock(thread_mutex_t *m) {
-  if (!m)
-    return -1;
-#ifdef USE_PREEM
-  lock_preemption();
-#endif
-  while (m->dummy) {
-    if (currentThread->state != BLOCKED) {
-      currentThread->state = BLOCKED;
-      TAILQ_INSERT_TAIL((struct mutexQueue *)m->waitingQueue, currentThread,
-                        entries);
+int thread_mutex_lock(thread_mutex_t *m)
+{
+    if (!m) return -1;
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
+    //while (m->dummy) {
+    if (__sync_lock_test_and_set(&m->dummy, 1)){ //0 si le mutex etait libre, 1 sinon
+        if (currentThread->state != BLOCKED) {
+            currentThread->state = BLOCKED;
+            TAILQ_INSERT_TAIL((struct mutexQueue*) m->waitingQueue, currentThread, entries);
+        }
+        thread_yield();
     }
-    thread_yield();
-  }
-  m->dummy = 1;
-#ifdef USE_PREEM
-  unlock_preemption();
-#endif
-  return 0;
+    //m->dummy = 1;
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
+    return 0;
 }
 
-int thread_mutex_unlock(thread_mutex_t *m) {
-  if (!m)
-    return -1;
+int thread_mutex_unlock(thread_mutex_t *m)
+{
+    if (!m) return -1;
+    #ifdef USE_PREEM
+        lock_preemption();
+    #endif
+    //m->dummy = 0;
+    //s'il y a des threads en attente on les reveille sans liberer le mutex 
+    if (!TAILQ_EMPTY((struct mutexQueue*) m->waitingQueue)) {
+        thread_s* myTurnThread = TAILQ_FIRST((struct mutexQueue*) m->waitingQueue);
+        TAILQ_REMOVE((struct mutexQueue*) m->waitingQueue, myTurnThread, entries);
+        myTurnThread->state = READY;
+        TAILQ_INSERT_TAIL(&readyQueue, myTurnThread, entries);        
+    }
+    else {
+        __sync_lock_release(&m->dummy); //personne en attente, on libere le mutex
+    }
+    #ifdef USE_PREEM
+        unlock_preemption();
+    #endif
+    return 0;
+}
+
+//semaphores
+
+int thread_sem_init(thread_sem_t *sem, unsigned int value) {
+    if (!sem) return -1;
+    sem->value = value;
+    sem->waitingQueue = malloc(sizeof(struct threadQueue));
+    TAILQ_INIT((struct threadQueue*) sem->waitingQueue);
+    return 0;
+}
+
+int thread_sem_destroy(thread_sem_t *sem) {
+    if (!sem) return -1;
+    free(sem->waitingQueue);
+    return 0;
+}
+
+int thread_sem_wait(thread_sem_t *sem) {
+    if (!sem) return -1;
+
 #ifdef USE_PREEM
-  lock_preemption();
+    lock_preemption();
 #endif
-  m->dummy = 0;
-  if (!TAILQ_EMPTY((struct mutexQueue *)m->waitingQueue)) {
-    thread_s *myTurnThread = TAILQ_FIRST((struct mutexQueue *)m->waitingQueue);
-    TAILQ_REMOVE((struct mutexQueue *)m->waitingQueue, myTurnThread, entries);
-    myTurnThread->state = READY;
-    enqueue_ready(myTurnThread);
-  }
+
+    // Si la valeur est 0, on doit bloquer le thread
+    if (sem->value == 0) {
+        currentThread->state = BLOCKED;
+        TAILQ_INSERT_TAIL((struct threadQueue*) sem->waitingQueue, currentThread, entries);
+        
+        thread_yield(); 
+    }
+    else {
+        __sync_fetch_and_sub(&sem->value, 1); //decrementation atomique
+    }
+
 #ifdef USE_PREEM
-  unlock_preemption();
+    unlock_preemption();
 #endif
-  return 0;
+    return 0;
+}
+
+int thread_sem_post(thread_sem_t *sem) {
+    if (!sem) return -1;
+
+#ifdef USE_PREEM
+    lock_preemption();
+#endif    
+
+    if (!TAILQ_EMPTY((struct threadQueue*) sem->waitingQueue)) {
+        thread_s* nextThread = TAILQ_FIRST((struct threadQueue*) sem->waitingQueue);
+        TAILQ_REMOVE((struct threadQueue*) sem->waitingQueue, nextThread, entries);
+        
+        nextThread->state = READY;
+        TAILQ_INSERT_TAIL(&readyQueue, nextThread, entries);
+    }
+    else {
+        __sync_fetch_and_add(&sem->value, 1); //incrementation atomique cqr il n'y a personne en attente
+    }
+
+#ifdef USE_PREEM
+    unlock_preemption();
+#endif
+    return 0;
+}
+
+// variables de condition
+int thread_cond_init(thread_cond_t *cond) {
+    cond->waitingQueue = malloc(sizeof(struct threadQueue));
+    TAILQ_INIT((struct threadQueue*) cond->waitingQueue);
+    return 0;
+}
+
+int thread_cond_wait(thread_cond_t *cond, thread_mutex_t *mutex) {
+#ifdef USE_PREEM
+    lock_preemption();
+#endif
+    //on libere le mutex avant de se bloquer
+    thread_mutex_unlock(mutex);
+
+    //on se bloque sur la condition(passive)
+    currentThread->state = BLOCKED;
+    TAILQ_INSERT_TAIL((struct threadQueue*) cond->waitingQueue, currentThread, entries);    
+    thread_yield();
+
+    //on deverouille le mutex apres reveil
+    thread_mutex_lock(mutex);
+#ifdef USE_PREEM
+    unlock_preemption();
+#endif
+    return 0;
+}
+
+int thread_cond_signal(thread_cond_t *cond) {
+#ifdef USE_PREEM
+    lock_preemption();
+#endif
+
+    if (!TAILQ_EMPTY((struct threadQueue*) cond->waitingQueue)) {
+        thread_s* th = TAILQ_FIRST((struct threadQueue*) cond->waitingQueue);
+        TAILQ_REMOVE((struct threadQueue*) cond->waitingQueue, th, entries);
+        th->state = READY;
+        TAILQ_INSERT_TAIL(&readyQueue, th, entries);
+    }
+
+#ifdef USE_PREEM
+    unlock_preemption();
+#endif
+    return 0;
+}
+
+int thread_cond_broadcast(thread_cond_t *cond) {
+#ifdef USE_PREEM
+    lock_preemption();
+#endif 
+    while (!TAILQ_EMPTY((struct threadQueue*) cond->waitingQueue)) {
+        thread_s* th = TAILQ_FIRST((struct threadQueue*) cond->waitingQueue);
+        TAILQ_REMOVE((struct threadQueue*) cond->waitingQueue, th, entries);
+        th->state = READY;
+        TAILQ_INSERT_TAIL(&readyQueue, th, entries);
+    }
+#ifdef USE_PREEM
+    unlock_preemption();
+#endif
+    return 0;
+}
+
+int thread_cond_destroy(thread_cond_t *cond) {
+    if (!cond) return -1;
+    free(cond->waitingQueue);
+    return 0;
 }

@@ -58,6 +58,28 @@ int thread_mutex_destroy(thread_mutex_t *mutex);
 int thread_mutex_lock(thread_mutex_t *mutex);
 int thread_mutex_unlock(thread_mutex_t *mutex);
 
+/* Interface pour les sémaphores */
+typedef struct thread_sem {
+    unsigned int value;
+    void* waitingQueue;
+} thread_sem_t;
+
+int thread_sem_init(thread_sem_t *sem, unsigned int value);
+int thread_sem_destroy(thread_sem_t *sem);
+int thread_sem_wait(thread_sem_t *sem); //P()
+int thread_sem_post(thread_sem_t *sem); //V()
+
+/* Interface possible pour les variables de condition */
+typedef struct thread_cond {
+    void* waitingQueue;
+} thread_cond_t;
+
+int thread_cond_init(thread_cond_t *cond);
+int thread_cond_destroy(thread_cond_t *cond);
+int thread_cond_wait(thread_cond_t *cond, thread_mutex_t *mutex);
+int thread_cond_signal(thread_cond_t *cond); // reveille un thread en attente sur la condition
+int thread_cond_broadcast(thread_cond_t *cond); // reveille tous les threads en attente sur la condition
+
 #else /* USE_PTHREAD */
 
 /* Si on compile avec -DUSE_PTHREAD, ce sont les pthreads qui sont utilisés */
