@@ -4,6 +4,13 @@
 
 // extern void thread_init(void);
 
+#ifndef USE_STACK_PROT
+int main(void) {
+  printf("stack_overflow: ignore sans -DUSE_STACK_PROT\n");
+  return EXIT_SUCCESS;
+}
+#else
+
 void *infinite_recursion(void *arg) {
   volatile char
       buffer[1024]; // volatile to prevent the compiler from optimizing, it
@@ -24,3 +31,5 @@ int main() {
   thread_join(th, NULL);
   return 0;
 }
+
+#endif

@@ -170,8 +170,12 @@ static jmp_buf exitEnv;
 
 static void exitFunc() {
   if (currentThread != &mainThread) {
-    // un seul free car maintenant les deux se font avec le meme malloc
+#ifdef USE_ONE_MALLOC
     free(currentThread);
+#else
+    free(currentThread->stack);
+    free(currentThread);
+#endif
   }
   exit(0);
 }
@@ -396,57 +400,79 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
 
   thread_s *newThread = NULL;
 
+#ifdef USE_RECYCLE
   if (!TAILQ_EMPTY(&freeQueue)) {
     newThread = TAILQ_FIRST(&freeQueue);
     TAILQ_REMOVE(&freeQueue, newThread, entries);
-
     newThread->valgrind_stackid =
         VALGRIND_STACK_REGISTER(newThread->stack, newThread->stack + SizeStack);
-  }
-
-  else {
-    void *block = NULL;
+  } else {
+#endif
 
 #ifdef USE_STACK_PROT
-    size_t page_size = sysconf(_SC_PAGESIZE);
-    size_t struct_size_aligned =
-        (THREAD_ALLOC_SIZE + page_size - 1) & ~(page_size - 1);
-    size_t total_len = struct_size_aligned + page_size + SizeStack;
+    {
+      void *block = NULL;
+      size_t page_size = sysconf(_SC_PAGESIZE);
+      size_t struct_size_aligned =
+          (THREAD_ALLOC_SIZE + page_size - 1) & ~(page_size - 1);
+      size_t total_len = struct_size_aligned + page_size + SizeStack;
 
-    if (posix_memalign(&block, page_size, total_len) != 0) {
+      if (posix_memalign(&block, page_size, total_len) != 0) {
 #ifdef USE_PREEM
-      unlock_preemption();
+        unlock_preemption();
 #endif
-      return -1;
+        return -1;
+      }
+
+      newThread = (thread_s *)block;
+      void *guard_page = (char *)block + struct_size_aligned;
+      newThread->stack = (char *)guard_page + page_size;
+
+      if (mprotect(guard_page, page_size, PROT_NONE) == -1) {
+        perror("mprotect");
+        free(block);
+#ifdef USE_PREEM
+        unlock_preemption();
+#endif
+        return -1;
+      }
     }
-
-    newThread = (thread_s *)block;
-    void *guard_page = (char *)block + struct_size_aligned;
-    newThread->stack = (char *)guard_page + page_size;
-
-    if (mprotect(guard_page, page_size, PROT_NONE) == -1) {
-      perror("mprotect");
-      free(block);
+#elif defined(USE_ONE_MALLOC)
+    {
+      void *block = malloc(THREAD_ALLOC_SIZE + SizeStack);
+      if (block == NULL) {
 #ifdef USE_PREEM
-      unlock_preemption();
+        unlock_preemption();
 #endif
-      return -1;
+        return -1;
+      }
+      newThread = (thread_s *)block;
+      newThread->stack = (char *)block + THREAD_ALLOC_SIZE;
     }
 #else
-    block = malloc(THREAD_ALLOC_SIZE + SizeStack);
-    if (block == NULL) {
+    newThread = malloc(sizeof(thread_s));
+    if (newThread == NULL) {
 #ifdef USE_PREEM
       unlock_preemption();
 #endif
       return -1;
     }
-    newThread = (thread_s *)block;
-    newThread->stack = (char *)block + THREAD_ALLOC_SIZE;
+    newThread->stack = malloc(SizeStack);
+    if (newThread->stack == NULL) {
+      free(newThread);
+#ifdef USE_PREEM
+      unlock_preemption();
+#endif
+      return -1;
+    }
 #endif
 
     newThread->valgrind_stackid =
         VALGRIND_STACK_REGISTER(newThread->stack, newThread->stack + SizeStack);
+
+#ifdef USE_RECYCLE
   }
+#endif
 
   newThread->state = READY;
   newThread->joiningThread = NULL;
@@ -633,7 +659,12 @@ int thread_join(thread_t thread, void **retval) {
       *retval = targetThread->retval;
     if (targetThread != &mainThread) {
       VALGRIND_STACK_DEREGISTER(targetThread->valgrind_stackid);
+#ifdef USE_ONE_MALLOC
       free(targetThread);
+#else
+      free(targetThread->stack);
+      free(targetThread);
+#endif
     }
   }
 
@@ -649,7 +680,16 @@ int thread_join(thread_t thread, void **retval) {
 
   if (targetThread != &mainThread) {
     VALGRIND_STACK_DEREGISTER(targetThread->valgrind_stackid);
+#ifdef USE_RECYCLE
     TAILQ_INSERT_TAIL(&freeQueue, targetThread, entries);
+#else
+#ifdef USE_ONE_MALLOC
+    free(targetThread);
+#else
+    free(targetThread->stack);
+    free(targetThread);
+#endif
+#endif
   }
 #ifdef USE_PREEM
   unlock_preemption();
@@ -660,12 +700,19 @@ int thread_join(thread_t thread, void **retval) {
 
 // pour que la fct s'execute a la fin toujours
 __attribute__((destructor)) static void cleanup_free_list(void) {
+#ifdef USE_RECYCLE
   thread_s *t;
   while (!TAILQ_EMPTY(&freeQueue)) {
     t = TAILQ_FIRST(&freeQueue);
     TAILQ_REMOVE(&freeQueue, t, entries);
+#ifdef USE_ONE_MALLOC
     free(t);
+#else
+    free(t->stack);
+    free(t);
+#endif
   }
+#endif
 }
 
 // on specifie à gcc que la fct ne retourne pas pour eviter les warnings

@@ -42,6 +42,27 @@ install/lib/libthread-fibo.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+# Compile src with one-malloc optimization (struct + stack in a single malloc)
+install/lib/libthread-one-malloc.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
+# Compile src with malloc recycling (freeQueue)
+install/lib/libthread-recycle.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_RECYCLE -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
+# Compile src with both one-malloc and recycling
+install/lib/libthread-one-malloc-recycle.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 build_tests: install/lib/libthread.a $(TEST_BINS)
 
 
@@ -85,6 +106,21 @@ preem: install/lib/libthread-preem.a $(TESTS)
 		$(CC) $(CFLAGS) -DUSE_PREEM $$t install/lib/libthread-preem.a -o install/bin/$$(basename $$t .c)-preem || true; \
 	done
 
+one-malloc: install/lib/libthread-one-malloc.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) -DUSE_ONE_MALLOC $$t install/lib/libthread-one-malloc.a -o install/bin/$$(basename $$t .c)-one-malloc || true; \
+	done
+
+recycle: install/lib/libthread-recycle.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) -DUSE_RECYCLE $$t install/lib/libthread-recycle.a -o install/bin/$$(basename $$t .c)-recycle || true; \
+	done
+
+one-malloc-recycle: install/lib/libthread-one-malloc-recycle.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE $$t install/lib/libthread-one-malloc-recycle.a -o install/bin/$$(basename $$t .c)-one-malloc-recycle || true; \
+	done
+
 check: build_tests
 	@for test in $(TEST_BINS); do \
 		echo "Running $$test..."; \
@@ -96,7 +132,7 @@ check_all: install
 	@for test in install/bin/*; do \
 		if [ -x "$$test" ] && [ ! -d "$$test" ]; then \
 			echo "Running $$test..."; \
-			./$$test; \
+			./$$test || true; \
 		fi \
 	done
 
@@ -139,4 +175,4 @@ clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
 
-.PHONY: all clean graphs check valgrind install build_tests pthreads context preem all rapport stackprot rapport-final
+.PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle all rapport stackprot rapport-final

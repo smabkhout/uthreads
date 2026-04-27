@@ -10,6 +10,13 @@
  * normalement.
  */
 
+#ifdef USE_PTHREAD
+int main(void) {
+  printf("deadlock: ignore avec USE_PTHREAD\n");
+  return EXIT_SUCCESS;
+}
+#else
+
 static thread_t th0, th1, th2;
 int totalerr = 0;
 
@@ -51,3 +58,4 @@ int main() {
     return EXIT_FAILURE;
   }
 }
+#endif
