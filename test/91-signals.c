@@ -4,6 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef USE_CONTEXT
+int main(void) {
+  printf("signals: ignore sans -DUSE_CONTEXT\n");
+  return EXIT_SUCCESS;
+}
+#else
+
 /* test des signaux inter-threads (sans signaux systeme).
  *
  * valgrind doit etre content.
@@ -109,3 +116,5 @@ int main(void) {
   printf("signals OK\n");
   return EXIT_SUCCESS;
 }
+
+#endif
