@@ -1,78 +1,36 @@
 \section{Signaux inter-threads en espace utilisateur}
 
-Dans la version finale de la bibliothèque, nous avons ajouté un mécanisme de
-signaux inter-threads entièrement en espace utilisateur, sans recourir aux
-signaux système POSIX. Ce choix s'imposait car le signal \texttt{SIGVTALRM}
-est déjà utilisé par le mode préemptif, et utiliser des signaux système pour
-la communication entre threads aurait introduit des interférences difficiles à
-contrôler.
+Nous avons ajouté un mécanisme de signaux inter-threads en espace utilisateur,
+sans signaux système POSIX, pour éviter les interférences avec \texttt{SIGVTALRM}
+déjà utilisé par la préemption.
 
-\subsection{Représentation des signaux}
+\subsection{Implémentation}
 
-Les signaux sont représentés par un masque de bits \texttt{uint32\_t}, où le
-bit $i$ indique que le signal numéro $i$ est présent. Chaque thread dispose de
-trois nouveaux champs dans sa structure \texttt{thread\_s} :
+Les signaux sont représentés par un masque de bits \texttt{uint32\_t}. Trois
+champs ont été ajoutés à \texttt{thread\_s} : \texttt{pending\_signals} (signaux
+reçus non traités), \texttt{sig\_handlers[32]} (handlers enregistrés), et
+\texttt{sigwait\_mask} (signaux attendus via \texttt{thread\_sigwait}, exclus
+de la livraison aux handlers).
 
-\begin{itemize}
-    \item \texttt{pending\_signals} : masque des signaux reçus mais pas encore
-    traités.
-    \item \texttt{sig\_handlers[32]} : tableau de handlers, un par numéro de
-    signal (\texttt{NULL} si aucun handler n'est enregistré).
-    \item \texttt{sigwait\_mask} : masque des signaux qu'un thread attend
-    explicitement via \texttt{thread\_sigwait}. Ces signaux ne sont pas livrés
-    aux handlers tant que le thread est en attente.
-\end{itemize}
-
-\subsection{Fonctions implémentées}
-
-Trois fonctions ont été ajoutées, disponibles uniquement en mode
-\texttt{USE\_CONTEXT} :
+Trois fonctions sont disponibles en mode \texttt{USE\_CONTEXT} :
 
 \begin{itemize}
-    \item \texttt{thread\_kill(thread\_t t, int sig)} : pose le bit du signal
-    \texttt{sig} dans \texttt{pending\_signals} du thread cible. Si ce thread
-    est bloqué dans un \texttt{thread\_sigwait} attendant précisément ce
-    signal, il est immédiatement remis dans la \texttt{readyQueue}.
-
-    \item \texttt{thread\_signal(int sig, handler)} : enregistre un handler
-    pour le signal \texttt{sig} du thread courant et retourne l'ancien handler,
+    \item \texttt{thread\_kill} : pose le bit du signal dans
+    \texttt{pending\_signals} du thread cible et le réveille s'il était bloqué
+    sur ce signal.
+    \item \texttt{thread\_signal} : enregistre un handler pour un signal,
     à la manière de l'appel système \texttt{signal()}.
-
-    \item \texttt{thread\_sigwait(uint32\_t set, int *signo)} : bloque le
-    thread courant jusqu'à la réception d'un signal appartenant au masque
-    \texttt{set}. Si un signal correspondant est déjà en attente au moment de
-    l'appel, la fonction retourne immédiatement sans bloquer.
+    \item \texttt{thread\_sigwait} : bloque jusqu'à la réception d'un signal
+    du masque \texttt{set}, ou retourne immédiatement si le signal est déjà en
+    attente.
 \end{itemize}
 
-\subsection{Livraison coopérative}
-
-La bibliothèque étant coopérative, les signaux ne sont pas livrés de façon
-asynchrone. La fonction interne \texttt{deliver\_pending\_signals()} est
-appelée aux points de rendez-vous naturels : au retour du \texttt{swapcontext}
-dans \texttt{thread\_yield}, et au démarrage de chaque thread dans
-\texttt{thread\_wrapper}. Elle parcourt \texttt{pending\_signals \&
-\textasciitilde{}sigwait\_mask} et invoque les handlers enregistrés, en
-excluant les signaux réservés à un \texttt{thread\_sigwait} en cours.
+La livraison est coopérative : \texttt{deliver\_pending\_signals()} est appelée
+dans \texttt{thread\_yield} et au démarrage de chaque thread.
 
 \subsection{Test : \texttt{91-signals.c}}
 
-Nous avons ajouté le test \texttt{91-signals.c} qui couvre trois scénarios :
-
-\begin{enumerate}
-    \item \textbf{Sigwait bloquant :} un thread appelle \texttt{thread\_sigwait}
-    et se bloque. Un second thread lui envoie le signal via
-    \texttt{thread\_kill}. Le premier thread doit se réveiller et recevoir le
-    bon numéro de signal.
-
-    \item \textbf{Handler de signal :} un thread enregistre un handler pour un
-    signal, se l'envoie à lui-même, puis appelle \texttt{thread\_yield}. Le
-    handler doit être appelé exactement une fois lors du yield.
-
-    \item \textbf{Signal déjà en attente :} le signal est envoyé avant que le
-    receveur n'appelle \texttt{thread\_sigwait}. La fonction doit alors
-    retourner immédiatement, le signal étant déjà présent dans
-    \texttt{pending\_signals}.
-\end{enumerate}
-
-Le test se compile via \texttt{make signals}, qui utilise
-\texttt{-DUSE\_CONTEXT} et lie contre \texttt{libthread-context.a}.
+Le test couvre trois scénarios : sigwait bloquant (un thread attend, un autre
+envoie), livraison via handler après un yield, et signal déjà en attente au
+moment de l'appel à \texttt{thread\_sigwait}. Il se compile via
+\texttt{make signals}.
