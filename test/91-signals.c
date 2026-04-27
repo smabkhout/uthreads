@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define USE_CONTEXT
+// #define USE_CONTEXT
 
 #ifndef USE_CONTEXT
 int main(void) {
