@@ -51,6 +51,11 @@ Ajoute une page de protection (guard page) sans droits d'acces a la fin de la pi
 Une macro speciale TRICHER_FIBO permet d'intercepter les creations de threads massives et recursives (typiquement le calcul naif de Fibonacci). Elle met en place un cache de memoisation (bottom-up) qui transforme un temps d'execution exponentiel O(2^n) en temps lineaire O(n). 
 (Activee via make install/lib/libthread-fibo.a, le bloc dans le Makefile peut etre decommente pour tester le binaire 51-fibonacci).
 
+### 6. Ordonnancement par Priorite
+Active la gestion des priorites pour l'ordonnancement des threads. Au lieu d'une simple file FIFO (First-In, First-Out), la file d'attente (ready queue) est triee lors de l'insertion afin que l'ordonnanceur selectionne systematiquement les threads en fonction de leur niveau de priorite.
+* Commande : make priority
+* Genere les executables suffixes par -priority.
+
 ### 6. Tout compiler
 Pour compiler toutes les bibliotheques (.a) et toutes les declinaisons des tests.
 * Commande : make install

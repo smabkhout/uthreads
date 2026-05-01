@@ -1,1 +1,20 @@
 \section{Pour Aller Plus Loin}
+Bien que notre bibliothèque intègre déjà un ensemble solide de fonctionnalités avancées — telles que l'ordonnancement préemptif, la protection de la pile, la gestion des priorités et un mécanisme de signaux inter-threads —, elle offre encore de nombreuses perspectives d'évolution.
+Voici les ajouts envisageables :
+
+\subsection{Support multi-cœurs }
+
+Actuellement, tous nos threads utilisateur sont multiplexés sur un seul thread noyau, confinant l'exécution à un unique cœur physique. Le support multi-cœurs permettrait d'exécuter nos threads en parallèle grâce à\texttt{pthreads} internes. Cette évolution nécessiterait de protéger nos structures (comme \texttt{readyQueue}) à l'aide de verrous(\textit{spinlocks}), ce qui peut toutefois limiter les gains de performance en cas de forte contention. Il faudrait également y intégrer des fonctions pour fixer un thread sur un cœur donné, évitant ainsi les migrations coûteuses et optimisant le tout.
+
+
+\subsection{Barrières de synchronisation}
+
+Bien que notre bibliothèque propose déjà les primitives de synchronisation (mutex, sémaphores), l'ajout de barrières de synchronisation (\textit{barriers}) constituerait une extension logique. Techniquement, son implémentation serait abordable en combinant un compteur, un \texttt{thread\_mutex\_t} et une \texttt{thread\_cond\_t}  déjà présents dans notre système.
+
+\subsection{Verrous Lecture/Écriture (RwLocks)}
+
+Notre bibliothèque couvre déjà les besoins de synchronisation critiques via les mutex, sémaphores et variables de condition. La dernière étape fonctionnelle serait l'ajout de verrous lecture/écriture (\textit{RwLocks}). Ces verrous permettent d'optimiser drastiquement les performances dans les scénarios où une ressource partagée est très fréquemment lue par de multiples threads simultanément, mais très rarement modifiée.
+
+\subsection{Algorithmes d'ordonnancement avancés}
+
+Actuellement, notre ordonnanceur s'appuie sur une file d'attente gérant des priorités et un mécanisme de vieillissement (\textit{aging}). Une amélioration majeure consisterait à implémenter un algorithme dynamique plus sophistiqué, tel que le \textit{Completely Fair Scheduler} (CFS). Une implémentation inspirée du CFS  remplacerait notre file classique par un arbre Rouge-Noir. Cela garantirait une répartition parfaitement équitable du temps processeur (\textit{vruntime}) entre tous les threads.
