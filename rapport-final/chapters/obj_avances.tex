@@ -35,3 +35,51 @@ Le test couvre trois scénarios : sigwait bloquant (un thread attend, un autre
 envoie), livraison via handler après un yield, et signal déjà en attente au
 moment de l'appel à \texttt{thread\_sigwait}. Il se compile via
 \texttt{make signals}.
+
+
+\subsection{Ordonnancement préemptif}
+
+Nous avons ajouté la préemption pour interrompre automatiquement les threads qui monopolisent le processeur, 
+rendant les appels explicites à \texttt{thread\_yield()} facultatifs.
+
+\subsubsection{Implémentation}
+
+Activée par la macro \texttt{USE\_PREEM}, l'implémentation repose sur des interruptions temporelles :
+
+\begin{itemize}
+    \item \textbf{Interruptions} : Le système utilise \texttt{setitimer} pour envoyer périodiquement le signal \texttt{SIGVTALRM}. 
+    Le gestionnaire de ce signal force alors un changement de contexte.
+    \item \textbf{Sections critiques} : Pour protéger les files d'attente internes, 
+    un compteur \texttt{signals\_blocked} sert de verrou. 
+    On utilise des fonctions pour l'incrémenter temporairement afin de masquer le signal et empêcher toute préemption pendant des opérations sensibles (création de threads, ordonnancement, etc.).
+\end{itemize}
+
+
+\subsection{Ordonnancement par priorités et vieillissement}
+
+Afin d'optimiser le temps de réponse et d'éviter qu'un thread ne soit ignoré trop longtemps, nous avons amélioré l'ordonnanceur FIFO classique avec un système de priorités dynamiques intégrant un mécanisme de vieillissement (\textit{aging}).
+
+\subsubsection{Implémentation}
+
+Activé par la macro \texttt{USE\_PRIORITY}, ce système exploite le champ \texttt{priority} de la structure \texttt{thread\_s} (où une valeur numérique faible correspond à une priorité élevée). Il repose sur trois principes :
+
+\begin{itemize}
+    \item \textbf{File ordonnée} : Au lieu d'ajouter les threads aveuglément en fin de liste, la fonction \texttt{enqueue\_ready()} parcourt la \texttt{readyQueue} et insère le thread à sa juste place. À sa création, chaque thread reçoit une priorité de base fixée à 10.
+    \item \textbf{Vieillissement (\textit{aging})} : Pour éviter le phénomène de famine (\textit{starvation}), la fonction \texttt{thread\_yield()} décrémente systématiquement la priorité de tous les threads en attente dans la file. Un thread attendant depuis longtemps voit sa valeur tendre vers 0, garantissant son exécution prochaine.
+    \item \textbf{Réinitialisation} : Lorsqu'un thread cède le processeur (volontairement ou par préemption), sa priorité est réinitialisée à sa valeur de base (10) avant d'être réinséré dans l'ordonnanceur.
+\end{itemize}
+
+
+\subsection{Protection de la pile (\textit{Stack Guard}) ANAS GAD HADI }
+
+Afin de prévenir les corruptions de mémoire silencieuses causées par des dépassements de pile (\textit{stack overflow}), nous avons implémenté un mécanisme de protection matériel et logiciel.
+
+\subsubsection{Implémentation}
+
+Activé par la macro \texttt{USE\_STACK\_PROT}, ce mécanisme s'articule autour de trois éléments clés :
+
+\begin{itemize}
+    \item \textbf{Page de garde} : Lors de l'allocation de l'espace d'un thread (via \texttt{posix\_memalign} pour respecter l'alignement matériel), une page mémoire située à l'extrémité de la pile est rendue totalement inaccessible en utilisant l'appel système \texttt{mprotect} avec le drapeau \texttt{PROT\_NONE}.
+    \item \textbf{Interception du signal} : Si la pile d'un thread déborde et tente d'accéder à cette page de garde, le système génère une erreur de segmentation (\texttt{SIGSEGV}). Un gestionnaire personnalisé (\texttt{segfault\_handler}) intercepte ce signal pour afficher un message de diagnostic clair avant d'interrompre le programme.
+    \item \textbf{Pile alternative} : Pour garantir que le gestionnaire de signal puisse s'exécuter même si la pile du thread fautif est intégralement consommée, il s'appuie sur une pile de secours indépendante, configurée lors de l'initialisation via \texttt{sigaltstack}.
+\end{itemize}
