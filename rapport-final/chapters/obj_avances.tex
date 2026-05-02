@@ -86,4 +86,33 @@ Activé par la macro \texttt{USE\_STACK\_PROT}, ce mécanisme s'articule autour 
 
 \subsection{fonction de sychronisation(\textit{semaphore}) ANAS GAD HADI + test}
 
-\subsection{DEADLOCK(\textit{semaphore}) SALAH GAD HADI + test}
+\subsection{Détection de DEADLOCK}
+
+Dans notre implémentation, un thread ne peut se retrouver dans un état bloquant
+que via des opérations de synchronisation explicites : un \texttt{thread\_join},
+un \texttt{thread\_mutex\_lock} sur un mutex déjà verrouillé, ou un
+\texttt{thread\_sem\_wait} sur un sémaphore à zéro. Dans chacun de ces cas,
+le thread est retiré de la \texttt{readyQueue} et placé dans la file d'attente
+associée.
+
+La détection reste valide malgré ces différentes sources de blocage : si la
+\texttt{readyQueue} est vide, aucun thread ne s'exécute, donc personne ne peut
+libérer un mutex, poster un sémaphore ou terminer pour débloquer un
+\texttt{join}. Les threads bloqués s'attendent mutuellement sans issue possible,
+ce qui constitue nécessairement un deadlock.
+
+\subsubsection{Implémentation}
+
+À chaque appel à \texttt{thread\_join}, avant de bloquer le thread courant,
+on vérifie si la \texttt{readyQueue} deviendrait vide après ce blocage. Si c'est
+le cas, cela signifie que tous les threads restants sont bloqués sur un
+\texttt{join}, ce qui constitue nécessairement un deadlock : on retourne
+immédiatement \texttt{EDEADLK} sans bloquer le thread appelant.
+
+\subsubsection{Test : \texttt{81-deadlock.c}}
+
+Le test crée un cycle de trois threads : \texttt{main} (th0) joint th1,
+th1 joint th2, et th2 joint th0. La détection doit faire en sorte qu'exactement
+un des trois \texttt{thread\_join} retourne \texttt{EDEADLK}, les deux autres
+se terminant normalement une fois le cycle brisé. Le test vérifie que la somme
+des valeurs de retour est exactement \texttt{EDEADLK}.
