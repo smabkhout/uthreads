@@ -57,7 +57,7 @@ Activée par la macro \texttt{USE\_PREEM}, l'implémentation repose sur des inte
 
 \subsection{Ordonnancement par priorités et vieillissement}
 
-Afin d'optimiser le temps de réponse et d'éviter qu'un thread ne soit ignoré trop longtemps, nous avons amélioré l'ordonnanceur FIFO classique avec un système de priorités dynamiques intégrant un mécanisme de vieillissement (\textit{aging}).
+Afin d'optimiser le temps de réponse et d'éviter qu'un thread ne soit ignoré trop longtemps, nous avons amélioré l'ordonnanceur FIFO classique avec un système de priorités dynamiques intégrant un mécanisme de vieillissement.
 
 \subsubsection{Implémentation}
 
@@ -65,7 +65,7 @@ Activé par la macro \texttt{USE\_PRIORITY}, ce système exploite le champ \text
 
 \begin{itemize}
     \item \textbf{File ordonnée} : Au lieu d'ajouter les threads aveuglément en fin de liste, la fonction \texttt{enqueue\_ready()} parcourt la \texttt{readyQueue} et insère le thread à sa place. À sa création, chaque thread reçoit une priorité de base fixée à 10.
-    \item \textbf{Vieillissement (\textit{aging})} : Pour éviter le phénomène de famine (\textit{starvation}), la fonction \texttt{thread\_yield()} décrémente systématiquement la priorité de tous les threads en attente dans la file. Un thread attendant depuis longtemps voit sa valeur tendre vers 0, garantissant son exécution prochaine.
+    \item \textbf{Vieillissement} : Pour éviter le phénomène de famine, la fonction \texttt{thread\_yield()} décrémente systématiquement la priorité de tous les threads en attente dans la file. Un thread attendant depuis longtemps voit sa valeur tendre vers 0, garantissant son exécution prochaine.
     \item \textbf{Réinitialisation} : Lorsqu'un thread cède le processeur (volontairement ou par préemption), sa priorité est réinitialisée à sa valeur de base (10) avant d'être réinséré dans l'ordonnanceur.
 \end{itemize}
 
