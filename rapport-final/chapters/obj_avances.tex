@@ -70,7 +70,7 @@ Activé par la macro \texttt{USE\_PRIORITY}, ce système exploite le champ \text
 \end{itemize}
 
 
-\subsection{Protection de la pile (\textit{Stack Guard}) ANAS GAD HADI }
+\subsection{Protection de la pile (\textit{Stack Guard}) ANAS GAD HADI + test}
 
 Afin de prévenir les corruptions de mémoire silencieuses causées par des dépassements de pile (\textit{stack overflow}), nous avons implémenté un mécanisme de protection matériel et logiciel.
 
@@ -83,3 +83,7 @@ Activé par la macro \texttt{USE\_STACK\_PROT}, ce mécanisme s'articule autour 
     \item \textbf{Interception du signal} : Si la pile d'un thread déborde et tente d'accéder à cette page de garde, le système génère une erreur de segmentation (\texttt{SIGSEGV}). Un gestionnaire personnalisé (\texttt{segfault\_handler}) intercepte ce signal pour afficher un message de diagnostic clair avant d'interrompre le programme.
     \item \textbf{Pile alternative} : Pour garantir que le gestionnaire de signal puisse s'exécuter même si la pile du thread fautif est intégralement consommée, il s'appuie sur une pile de secours indépendante, configurée lors de l'initialisation via \texttt{sigaltstack}.
 \end{itemize}
+
+\subsection{fonction de sychronisation(\textit{semaphore}) ANAS GAD HADI + test}
+
+\subsection{DEADLOCK(\textit{semaphore}) SALAH GAD HADI + test}
