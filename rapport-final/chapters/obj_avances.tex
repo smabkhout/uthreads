@@ -1,40 +1,38 @@
 \section{Objectifs Avancés} 
 \subsection{Signaux inter-threads en espace utilisateur}
 
-Nous avons ajouté un mécanisme de signaux inter-threads en espace utilisateur,
-sans signaux système POSIX, pour éviter les interférences avec \texttt{SIGVTALRM}
-déjà utilisé par la préemption.
+Nous avons implémenté des signaux inter-threads purement en espace utilisateur,
+sans faire appel aux signaux POSIX. Contrairement aux signaux système comme
+\texttt{SIGVTALRM} utilisé par la préemption, ces signaux sont gérés entièrement
+par la bibliothèque, ce qui est cohérent avec son fonctionnement en espace
+utilisateur sans dépendance au noyau.
+
+\subsubsection{Compatibilité avec \texttt{setjmp}/\texttt{longjmp}}
+
+Les signaux reposent sur leurs propres champs bitmask et n'ont aucun lien avec
+le masque POSIX. \texttt{thread\_wrapper} étant appelé dans les deux modes et
+\texttt{deliver\_pending\_signals()} étant invoqué après chaque changement de
+contexte dans \texttt{thread\_yield}, les signaux fonctionnent également sans
+\texttt{USE\_CONTEXT}.
 
 \subsubsection{Implémentation}
 
-Les signaux sont représentés par un masque de bits \texttt{uint32\_t}. Trois
-champs ont été ajoutés à \texttt{thread\_s} : \texttt{pending\_signals} (signaux
-reçus non traités), \texttt{sig\_handlers[32]} (handlers enregistrés), et
-\texttt{sigwait\_mask} (signaux attendus via \texttt{thread\_sigwait}, exclus
-de la livraison aux handlers).
-
-Trois fonctions sont disponibles en mode \texttt{USE\_CONTEXT} :
-
-\begin{itemize}
-    \item \texttt{thread\_kill} : pose le bit du signal dans
-    \texttt{pending\_signals} du thread cible et le réveille s'il était bloqué
-    sur ce signal.
-    \item \texttt{thread\_signal} : enregistre un handler pour un signal,
-    à la manière de l'appel système \texttt{signal()}.
-    \item \texttt{thread\_sigwait} : bloque jusqu'à la réception d'un signal
-    du masque \texttt{set}, ou retourne immédiatement si le signal est déjà en
-    attente.
-\end{itemize}
-
-La livraison est coopérative : \texttt{deliver\_pending\_signals()} est appelée
-dans \texttt{thread\_yield} et au démarrage de chaque thread.
+Trois champs sont ajoutés à \texttt{thread\_s} : \texttt{pending\_signals}
+(bitmask des signaux reçus), \texttt{sig\_handlers[32]} (handlers enregistrés),
+et \texttt{sigwait\_mask} (signaux attendus via \texttt{thread\_sigwait}).
+Trois fonctions sont exposées : \texttt{thread\_kill} pour envoyer un signal,
+\texttt{thread\_signal} pour enregistrer un handler, et \texttt{thread\_sigwait}
+pour attendre un signal. La livraison est coopérative via
+\texttt{deliver\_pending\_signals()}, appelée au démarrage de chaque thread et
+après chaque changement de contexte dans \texttt{thread\_yield}.
 
 \subsubsection{Test : \texttt{91-signals.c}}
 
-Le test couvre trois scénarios : sigwait bloquant (un thread attend, un autre
-envoie), livraison via handler après un yield, et signal déjà en attente au
-moment de l'appel à \texttt{thread\_sigwait}. Il se compile via
-\texttt{make signals}.
+Le test couvre trois scénarios : un thread bloqué sur \texttt{thread\_sigwait}
+qui se réveille quand un autre lui envoie un signal via \texttt{thread\_kill} ;
+un handler enregistré qui est invoqué après un \texttt{thread\_yield} ; et un
+signal déjà en attente au moment de l'appel à \texttt{thread\_sigwait}, qui
+doit être consommé immédiatement sans bloquer.
 
 
 \subsection{Ordonnancement préemptif}
@@ -86,4 +84,33 @@ Activé par la macro \texttt{USE\_STACK\_PROT}, ce mécanisme s'articule autour 
 
 \subsection{fonction de sychronisation(\textit{semaphore}) ANAS GAD HADI + test}
 
-\subsection{DEADLOCK(\textit{semaphore}) SALAH GAD HADI + test}
+\subsection{Détection de DEADLOCK}
+
+Dans notre implémentation, un thread ne peut se retrouver dans un état bloquant
+que via des opérations de synchronisation explicites : un \texttt{thread\_join},
+un \texttt{thread\_mutex\_lock} sur un mutex déjà verrouillé, ou un
+\texttt{thread\_sem\_wait} sur un sémaphore à zéro. Dans chacun de ces cas,
+le thread est retiré de la \texttt{readyQueue} et placé dans la file d'attente
+associée.
+
+La détection reste valide malgré ces différentes sources de blocage : si la
+\texttt{readyQueue} est vide, aucun thread ne s'exécute, donc personne ne peut
+libérer un mutex, poster un sémaphore ou terminer pour débloquer un
+\texttt{join}. Les threads bloqués s'attendent mutuellement sans issue possible,
+ce qui constitue nécessairement un deadlock.
+
+\subsubsection{Implémentation}
+
+À chaque appel à \texttt{thread\_join}, avant de bloquer le thread courant,
+on vérifie si la \texttt{readyQueue} deviendrait vide après ce blocage. Si c'est
+le cas, cela signifie que tous les threads restants sont bloqués sur un
+\texttt{join}, ce qui constitue nécessairement un deadlock : on retourne
+immédiatement \texttt{EDEADLK} sans bloquer le thread appelant.
+
+\subsubsection{Test : \texttt{81-deadlock.c}}
+
+Le test crée un cycle de trois threads : \texttt{main} (th0) joint th1,
+th1 joint th2, et th2 joint th0. La détection doit faire en sorte qu'exactement
+un des trois \texttt{thread\_join} retourne \texttt{EDEADLK}, les deux autres
+se terminant normalement une fois le cycle brisé. Le test vérifie que la somme
+des valeurs de retour est exactement \texttt{EDEADLK}.
