@@ -42,11 +42,9 @@ extern int thread_join(thread_t thread, void **retval);
  */
 extern void thread_exit(void *retval) __attribute__((__noreturn__));
 
-#ifdef USE_CONTEXT
 extern int thread_kill(thread_t t, int sig);
 extern void (*thread_signal(int sig, void (*handler)(int)))(int);
 extern int thread_sigwait(uint32_t set, int *signo);
-#endif
 
 /* Interface possible pour les mutex */
 typedef struct thread_mutex {

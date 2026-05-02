@@ -4,14 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// #define USE_CONTEXT
-
-#ifndef USE_CONTEXT
+#ifdef USE_PTHREAD
 int main(void) {
-  printf("signals: ignore sans -DUSE_CONTEXT\n");
+  printf("signals: ignore avec USE_PTHREAD\n");
   return EXIT_SUCCESS;
 }
 #else
+
 
 /* test des signaux inter-threads (sans signaux systeme).
  *
@@ -103,5 +102,4 @@ int main(void) {
   printf("signals OK\n");
   return EXIT_SUCCESS;
 }
-
 #endif
