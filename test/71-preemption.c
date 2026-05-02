@@ -6,6 +6,13 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
+#ifndef USE_PREEM
+int main(void) {
+  printf("signals: ignore sans -DUSE_PREEM\n");
+  return EXIT_SUCCESS;
+}
+#else
+
 /* test de validation de la pré-emption (et par effet de bord de certaines
  * implémentation de priorités)
  *
@@ -105,3 +112,5 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
   }
 }
+
+#endif

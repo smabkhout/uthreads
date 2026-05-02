@@ -5,6 +5,18 @@ SRC=$(wildcard src/*.c)
 TESTS=$(wildcard test/*.c)
 TEST_BINS=$(patsubst test/%.c,install/bin/%,$(TESTS))
 
+ARGS_21-create-many           = 20
+ARGS_22-create-many-recursive = 20
+ARGS_23-create-many-once      = 20
+ARGS_31-switch-many           = 10 20
+ARGS_32-switch-many-join      = 10 20
+ARGS_33-switch-many-cascade   = 20 5
+ARGS_51-fibonacci             = 8
+ARGS_61-mutex                 = 20
+ARGS_62-mutex                 = 20
+ARGS_71_preemption			  = 5
+
+
 all: install
 
 # Compile src into a library in install/lib
@@ -88,57 +100,101 @@ install/bin/%: test/%.c install/lib/libthread.a
 
 pthreads: $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_PTHREAD $$t -lpthread -o install/bin/$$(basename $$t .c)-pthread || true; \
+		$(CC) $(CFLAGS) -DUSE_PTHREAD $$t -lpthread -o install/bin/$$(basename $$t .c)-pthread; \
 	done
 
 context: install/lib/libthread-context.a $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_CONTEXT $$t install/lib/libthread-context.a -o install/bin/$$(basename $$t .c)-context || true; \
+		$(CC) $(CFLAGS) -DUSE_CONTEXT $$t install/lib/libthread-context.a -o install/bin/$$(basename $$t .c)-context; \
 	done
 
 priority: install/lib/libthread-priority.a $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_PRIORITY $$t install/lib/libthread-priority.a -o install/bin/$$(basename $$t .c)-priority || true; \
+		$(CC) $(CFLAGS) -DUSE_PRIORITY $$t install/lib/libthread-priority.a -o install/bin/$$(basename $$t .c)-priority; \
 	done
 
 preem: install/lib/libthread-preem.a $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_PREEM $$t install/lib/libthread-preem.a -o install/bin/$$(basename $$t .c)-preem || true; \
+		$(CC) $(CFLAGS) -DUSE_PREEM $$t install/lib/libthread-preem.a -o install/bin/$$(basename $$t .c)-preem; \
 	done
 
 one-malloc: install/lib/libthread-one-malloc.a $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_ONE_MALLOC $$t install/lib/libthread-one-malloc.a -o install/bin/$$(basename $$t .c)-one-malloc || true; \
+		$(CC) $(CFLAGS) -DUSE_ONE_MALLOC $$t install/lib/libthread-one-malloc.a -o install/bin/$$(basename $$t .c)-one-malloc; \
 	done
 
 recycle: install/lib/libthread-recycle.a $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_RECYCLE $$t install/lib/libthread-recycle.a -o install/bin/$$(basename $$t .c)-recycle || true; \
+		$(CC) $(CFLAGS) -DUSE_RECYCLE $$t install/lib/libthread-recycle.a -o install/bin/$$(basename $$t .c)-recycle; \
 	done
 
 one-malloc-recycle: install/lib/libthread-one-malloc-recycle.a $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE $$t install/lib/libthread-one-malloc-recycle.a -o install/bin/$$(basename $$t .c)-one-malloc-recycle || true; \
+		$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE $$t install/lib/libthread-one-malloc-recycle.a -o install/bin/$$(basename $$t .c)-one-malloc-recycle; \
 	done
 
 check: build_tests
 	@for test in $(TEST_BINS); do \
-		echo "Running $$test..."; \
-		./$$test || true; \
+		base=$$(basename $$test); \
+		args=""; \
+		case $$base in \
+			"21-create-many"|"23-create-many-once") args="$(ARGS_21-create-many)" ;; \
+			"22-create-many-recursive")             args="$(ARGS_22-create-many-recursive)" ;; \
+			"31-switch-many"|"32-switch-many-join") args="$(ARGS_31-switch-many)" ;; \
+			"33-switch-many-cascade")               args="$(ARGS_33-switch-many-cascade)" ;; \
+			"51-fibonacci")                         args="$(ARGS_51-fibonacci)" ;; \
+			"61-mutex"|"62-mutex")                  args="$(ARGS_61-mutex)" ;; \
+			"65-semaphore")                         args="$(ARGS_65-semaphore)" ;; \
+			"71-preemption")                        args="$(ARGS_71_preemption)" ;; \
+		esac; \
+		echo "Executing $$test $$args..."; \
+		./$$test $$args || exit 1; \
 	done
 
 check_all: install
 	@echo "=== Running ALL tests in install/bin/ ==="
 	@for test in install/bin/*; do \
 		if [ -x "$$test" ] && [ ! -d "$$test" ]; then \
-			echo "Running $$test..."; \
-			./$$test || true; \
+			base=$$(basename $$test); \
+			while true; do \
+				prev=$$base; \
+				for s in -context -priority -preem -fibo -one-malloc -recycle -stackprot -pthread; do \
+					base=$${base%%$$s}; \
+				done; \
+				[ "$$prev" = "$$base" ] && break; \
+			done; \
+			args=""; \
+			case "$$base" in \
+				"21-create-many"|"23-create-many-once") args="$(ARGS_21-create-many)" ;; \
+				"22-create-many-recursive")             args="$(ARGS_22-create-many-recursive)" ;; \
+				"31-switch-many"|"32-switch-many-join") args="$(ARGS_31-switch-many)" ;; \
+				"33-switch-many-cascade")               args="$(ARGS_33-switch-many-cascade)" ;; \
+				"51-fibonacci")                         args="$(ARGS_51-fibonacci)" ;; \
+				"61-mutex"|"62-mutex")                  args="$(ARGS_61-mutex)" ;; \
+				"65-semaphore")                         args="$(ARGS_65-semaphore)" ;; \
+				"71-preemption")                        args="$(ARGS_71_preemption)" ;; \
+				"81-deadlock")                          args="$(ARGS_81-deadlock)" ;; \
+			esac; \
+			echo "Running $$test $$args..."; \
+			./$$test $$args || exit 1; \
 		fi \
 	done
-
 valgrind: build_tests
 	@for test in $(TEST_BINS); do \
-		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test || true; \
+		base=$$(basename $$test); \
+		args=""; \
+		case $$base in \
+			"21-create-many"|"23-create-many-once") args="$(ARGS_21-create-many)" ;; \
+			"22-create-many-recursive")             args="$(ARGS_22-create-many-recursive)" ;; \
+			"31-switch-many"|"32-switch-many-join") args="$(ARGS_31-switch-many)" ;; \
+			"33-switch-many-cascade")               args="$(ARGS_33-switch-many-cascade)" ;; \
+			"51-fibonacci")                         args="$(ARGS_51-fibonacci)" ;; \
+			"61-mutex"|"62-mutex")                  args="$(ARGS_61-mutex)" ;; \
+			"65-semaphore")                         args="$(ARGS_65-semaphore)" ;; \
+			"71-preemption")                        args="$(ARGS_71_preemption)" ;; \
+		esac; \
+		echo "Valgrind on $$test $$args..."; \
+		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test $$args || exit 1; \
 	done
 
 graphs: install
@@ -159,12 +215,10 @@ install/lib/libthread-stackprot.a: $(SRC)
 	$(CC) $(CFLAGS) -DUSE_STACK_PROT -c $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
-
-#compile all tests with stack prot
-stackprot: install/lib/libthread-stackprot.a $(TESTS)
-	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_STACK_PROT $$t install/lib/libthread-stackprot.a -o install/bin/$$(basename $$t .c)-stackprot || true; \
-	done
+# Compile seulement le test de stack overflow avec le support stackprot
+stackprot: install/lib/libthread-stackprot.a test/90-stack_overflow.c
+	mkdir -p install/bin
+	$(CC) $(CFLAGS) -DUSE_STACK_PROT test/90-stack_overflow.c install/lib/libthread-stackprot.a -o install/bin/90-stack_overflow-stackprot
 
 signals: install/lib/libthread-context.a test/91-signals.c
 	mkdir -p install/bin
