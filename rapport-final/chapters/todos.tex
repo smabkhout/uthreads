@@ -9,7 +9,7 @@ Voici les ajouts envisageables :
 
 Actuellement, tous nos threads utilisateur sont multiplexés sur un seul thread noyau, 
 confinant l'exécution à un unique cœur physique. 
-Le support multi-cœurs permettrait d'exécuter nos threads en parallèle grâce à\texttt{pthreads} internes. 
+Le support multi-cœurs permettrait d'exécuter nos threads en parallèle grâce à \texttt{pthreads} internes. 
 Cette évolution nécessiterait de protéger nos structures (comme \texttt{readyQueue}) 
 à l'aide de verrous(\textit{spinlocks}), ce qui peut toutefois limiter les gains de performance 
 en cas de forte contention. Il faudrait également y intégrer des fonctions pour 

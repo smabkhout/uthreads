@@ -44,17 +44,14 @@ Le premier graphe compare toutes les variantes de notre bibliothèque avec les \
 
 \begin{figure}[H]
     \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{images/21-create-many-pthread.png}
-        \caption{Création/destruction : toutes variantes + pthreads.}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{images/31-switch-many-pthread.png}
-        \caption{Changements de contexte : toutes variantes + pthreads.}
-    \end{minipage}
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/21-create-many-pthread.png}
+    \caption{Création/destruction de $n$ threads : toutes variantes + pthreads.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/31-switch-many-pthread.png}
+    \caption{Changements de contexte ($n$ threads $\times$ 50 yields) : toutes variantes + pthreads.}
 \end{figure}
 
 Les pthreads se révèlent nettement plus lents que toutes nos variantes.
@@ -77,17 +74,14 @@ En retirant les pthreads du graphe, les différences entre nos variantes devienn
 
 \begin{figure}[H]
     \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{images/21-create-many-context.png}
-        \caption{Création/destruction : ucontext vs setjmp/longjmp.}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{images/31-switch-many-context.png}
-        \caption{Changements de contexte : ucontext vs setjmp/longjmp.}
-    \end{minipage}
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/21-create-many-context.png}
+    \caption{Création/destruction : ucontext vs variantes setjmp/longjmp.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/31-switch-many-context.png}
+    \caption{Changements de contexte : ucontext vs variantes setjmp/longjmp.}
 \end{figure}
 
 La variante \texttt{ucontext} (\texttt{makecontext}/\texttt{swapcontext}) est plus lente
@@ -104,17 +98,14 @@ variantes \texttt{setjmp/longjmp} entre elles.
 
 \begin{figure}[H]
     \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{images/21-create-many-optim.png}
-        \caption{Optimisations mémoire : création/destruction.}
-    \end{minipage}
-    \hfill
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{images/31-switch-many-optim.png}
-        \caption{Optimisations mémoire : changements de contexte.}
-    \end{minipage}
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/21-create-many-optim.png}
+    \caption{Optimisations mémoire : création/destruction de threads.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/31-switch-many-optim.png}
+    \caption{Optimisations mémoire : changements de contexte.}
 \end{figure}
 
 \begin{itemize}
@@ -125,3 +116,21 @@ variantes \texttt{setjmp/longjmp} entre elles.
           évitant les appels répétés à \texttt{malloc}/\texttt{free}.
     \item \textbf{one-malloc + recycle} : combinaison des deux optimisations, version la plus performante.
 \end{itemize}
+
+Ces optimisations portent exclusivement sur l'allocation et la libération mémoire des threads.
+Elles n'ont donc d'impact que lors de la \textbf{création et destruction} de threads :
+sur le test \texttt{31-switch-many}, les quatre courbes se superposent quasiment,
+car tous les changements de contexte utilisent les mêmes mécanismes indépendamment
+de la stratégie d'allocation.
+
+En revanche, sur le test \texttt{21-create-many}, les différences sont nettes.
+La variante \textbf{one-malloc} réduit de moitié le nombre d'appels à
+\texttt{malloc}/\texttt{free} en regroupant structure et pile dans un seul bloc,
+ce qui se traduit par un gain visible mais modéré.
+La variante \textbf{recycle} va plus loin : en réutilisant les blocs déjà alloués,
+elle supprime presque entièrement les appels système liés à l'allocation dès que
+les threads sont créés et détruits en boucle, ce qui en fait l'optimisation
+la plus impactante.
+La version \textbf{one-malloc + recycle} combine les deux et reste très proche
+de la version recycle seule, ce qui confirme que le recyclage est l'optimisation
+dominante et la plus puissante.
