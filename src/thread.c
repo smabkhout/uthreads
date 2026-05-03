@@ -326,12 +326,14 @@ static void deliver_pending_signals() { // on appelle les handlers si on les tro
   while (pending) {
     int sig = 0;
     while (!((pending >> sig) & 1)) sig++;
-
-    // on efface ce signal car on va appeler son handler
-    currentThread->pending_signals &= ~((uint32_t)1 << sig);
     pending &= ~((uint32_t)1 << sig);
-    if (currentThread->sig_handlers[sig])
+
+    // on ne consomme le signal que s'il y a un handler enregistre
+    // sinon on le laisse dans pending_signals pour que thread_sigwait puisse le voir
+    if (currentThread->sig_handlers[sig]) {
+      currentThread->pending_signals &= ~((uint32_t)1 << sig);
       currentThread->sig_handlers[sig](sig);
+    }
   }
 }
 

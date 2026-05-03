@@ -10,9 +10,9 @@ utilisateur sans dépendance au noyau.
 \subsubsection{Compatibilité avec \texttt{setjmp}/\texttt{longjmp}}
 
 Les signaux reposent sur leurs propres champs bitmask et n'ont aucun lien avec
-le masque POSIX. \texttt{thread\_wrapper} étant appelé dans les deux modes et
+le masque POSIX. \texttt{thread\_wrapper} étant appelé dans les deux modes (context et setjmp/longjmp) et
 \texttt{deliver\_pending\_signals()} étant invoqué après chaque changement de
-contexte dans \texttt{thread\_yield}, les signaux fonctionnent également sans
+contexte dans \texttt{thread\_yield}, les signaux fonctionnent donc également sans
 \texttt{USE\_CONTEXT}.
 
 \subsubsection{Implémentation}

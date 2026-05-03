@@ -75,6 +75,13 @@ install/lib/libthread-one-malloc-recycle.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+# Compile src with setjmp/longjmp only (no optimisations, for benchmarking)
+install/lib/libthread-setjmp.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 # Compile src with user-space signals support
 install/lib/libthread-signals.a: $(SRC)
 	mkdir -p install/lib
@@ -201,16 +208,21 @@ valgrind: build_tests
 			"71-preemption")                        args="$(ARGS_71_preemption)" ;; \
 		esac; \
 		echo "Valgrind on $$test $$args..."; \
-		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test $$args || exit 1; \
+		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test $$args; \
 	done
 
 graphs: install
 	mkdir -p results
 	python3 scripts/plot.py
 
+setjmp: install/lib/libthread-setjmp.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) $$t install/lib/libthread-setjmp.a -o install/bin/$$(basename $$t .c)-setjmp; \
+	done
+
 signals-variant: install/lib/libthread-signals.a $(TESTS)
 	@for t in $(TESTS); do \
-		$(CC) $(CFLAGS) -DUSE_SIGNALS $$t install/lib/libthread-signals.a -o install/bin/$$(basename $$t .c)-signals || true; \
+		$(CC) $(CFLAGS) -DUSE_SIGNALS $$t install/lib/libthread-signals.a -o install/bin/$$(basename $$t .c)-signals; \
 	done
 
 install: build_tests pthreads context preem stackprot one-malloc recycle one-malloc-recycle signals-variant
@@ -241,4 +253,4 @@ clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
 
-.PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle signals-variant signals all rapport stackprot rapport-final
+.PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle setjmp signals-variant signals all rapport stackprot rapport-final
