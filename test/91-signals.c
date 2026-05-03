@@ -4,9 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef USE_PTHREAD
+#if defined(USE_PTHREAD) || !defined(USE_SIGNALS)
 int main(void) {
-  printf("signals: ignore avec USE_PTHREAD\n");
+  printf("signals: ignore sans USE_SIGNALS\n");
   return EXIT_SUCCESS;
 }
 #else

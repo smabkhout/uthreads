@@ -28,7 +28,8 @@ après chaque changement de contexte dans \texttt{thread\_yield}.
 
 \subsubsection{Test : \texttt{91-signals.c}}
 
-Le test couvre trois scénarios : un thread bloqué sur \texttt{thread\_sigwait}
+Le test, compilé avec le flag \texttt{-DUSE\_SIGNALS} via \texttt{make signals},
+couvre trois scénarios : un thread bloqué sur \texttt{thread\_sigwait}
 qui se réveille quand un autre lui envoie un signal via \texttt{thread\_kill} ;
 un handler enregistré qui est invoqué après un \texttt{thread\_yield} ; et un
 signal déjà en attente au moment de l'appel à \texttt{thread\_sigwait}, qui
