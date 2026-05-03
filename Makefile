@@ -211,7 +211,7 @@ valgrind: build_tests
 		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test $$args; \
 	done
 
-graphs: install
+graphs: install setjmp
 	mkdir -p results
 	python3 scripts/plot.py
 
