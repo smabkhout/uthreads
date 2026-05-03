@@ -1,1 +1,127 @@
 \section{Performances}
+
+\subsection{Environnement de test}
+
+\subsubsection{Spécifications matérielles}
+
+Les mesures ont été effectuées sur la machine suivante :
+
+\begin{itemize}
+    \item \textbf{Processeur} : AMD Ryzen 7 5700U (8 cœurs physiques, 16 threads logiques, jusqu'à 4,37 GHz)
+    \item \textbf{Caches} : L1d/L1i 256 Kio $\times$ 8, L2 4 Mio $\times$ 8, L3 8 Mio
+    \item \textbf{Mémoire RAM} : 16 Go
+    \item \textbf{Système} : Linux x86\_64
+\end{itemize}
+
+\subsubsection{Conditions d'exécution}
+
+Afin d'obtenir des mesures reproductibles et comparables :
+
+\begin{itemize}
+    \item Chaque binaire est épinglé sur un \textbf{seul cœur} (cœur 0) via \texttt{taskset -c 0},
+          éliminant les migrations de tâches et les effets de cache inter-cœurs.
+    \item Chaque configuration est exécutée \textbf{10 fois} (\texttt{RUNS = 10}) ;
+          on rapporte la \textbf{moyenne} et l'\textbf{écart-type} sous forme de barres d'erreur.
+    \item Les temps sont mesurés à l'intérieur du binaire et émis sur la sortie standard
+          sous la forme \texttt{GRAPH;<temps en µs>}, puis convertis en millisecondes.
+\end{itemize}
+
+Deux tests ont été retenus pour l'évaluation :
+\begin{itemize}
+    \item \texttt{21-create-many} : crée et détruit $n$ threads séquentiellement,
+          ce qui sollicite intensivement l'allocation et la libération mémoire.
+    \item \texttt{31-switch-many} : crée $n$ threads effectuant chacun 50 \texttt{thread\_yield},
+          ce qui génère un grand nombre de changements de contexte.
+\end{itemize}
+Ces deux tests couvrent les deux axes de performance les plus significatifs
+d'une bibliothèque de threads.
+
+Les graphes sont générés automatiquement par \texttt{scripts/plot.py} via \texttt{make graphs}.
+
+\subsection{Vue d'ensemble : pthreads vs bibliothèque utilisateur}
+
+Le premier graphe compare toutes les variantes de notre bibliothèque avec les \textbf{pthreads POSIX}.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/21-create-many-pthread.png}
+        \caption{Création/destruction : toutes variantes + pthreads.}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/31-switch-many-pthread.png}
+        \caption{Changements de contexte : toutes variantes + pthreads.}
+    \end{minipage}
+\end{figure}
+
+Les pthreads se révèlent nettement plus lents que toutes nos variantes.
+Cela s'explique par leur nature de \textbf{threads noyau} : chaque création passe
+par l'appel système \texttt{clone}, et chaque changement de contexte implique une
+transition espace utilisateur/noyau via l'ordonnanceur du système.
+Notre bibliothèque opère entièrement en espace utilisateur, supprimant ces
+transitions coûteuses au prix d'un ordonnancement coopératif.
+
+Ces benchmarks sont toutefois réalisés sur un \textbf{seul cœur}, ce qui défavorise
+structurellement les pthreads. Sur une charge de travail réellement parallèle
+et CPU-intensive, les pthreads surpasseraient notre bibliothèque : ils peuvent
+exploiter les \textbf{multiples cœurs} du processeur simultanément, tandis que
+nos threads utilisateur s'exécutent tous sur le même cœur et ne bénéficient
+d'aucun parallélisme réel.
+
+\subsection{Comparaison \texttt{ucontext} vs \texttt{setjmp/longjmp}}
+
+En retirant les pthreads du graphe, les différences entre nos variantes deviennent visibles.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/21-create-many-context.png}
+        \caption{Création/destruction : ucontext vs setjmp/longjmp.}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/31-switch-many-context.png}
+        \caption{Changements de contexte : ucontext vs setjmp/longjmp.}
+    \end{minipage}
+\end{figure}
+
+La variante \texttt{ucontext} (\texttt{makecontext}/\texttt{swapcontext}) est plus lente
+que les variantes \texttt{setjmp/longjmp}. En effet, \texttt{swapcontext} sauvegarde
+l'intégralité du contexte d'exécution, y compris le \textbf{masque de signaux POSIX},
+ce qui implique un appel système supplémentaire à chaque changement de contexte.
+\texttt{setjmp/longjmp} se contente de sauvegarder le compteur de programme,
+le pointeur de pile et quelques registres essentiels, évitant cet appel système.
+
+\subsection{Impact des optimisations mémoire}
+
+En retirant également \texttt{ucontext}, on peut comparer finement les quatre
+variantes \texttt{setjmp/longjmp} entre elles.
+
+\begin{figure}[H]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/21-create-many-optim.png}
+        \caption{Optimisations mémoire : création/destruction.}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{images/31-switch-many-optim.png}
+        \caption{Optimisations mémoire : changements de contexte.}
+    \end{minipage}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{setjmp/longjmp} : deux \texttt{malloc} séparés (structure + pile), version de référence.
+    \item \textbf{one-malloc} : structure et pile allouées en un seul bloc contigu (\texttt{-DUSE\_ONE\_MALLOC}),
+          réduisant la fragmentation et améliorant la localité de cache.
+    \item \textbf{recycle} : file de réutilisation des blocs libérés (\texttt{-DUSE\_RECYCLE}),
+          évitant les appels répétés à \texttt{malloc}/\texttt{free}.
+    \item \textbf{one-malloc + recycle} : combinaison des deux optimisations, version la plus performante.
+\end{itemize}
