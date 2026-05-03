@@ -19,10 +19,10 @@ ARGS_71_preemption			  = 5
 
 all: install
 
-# Compile src into a library in install/lib
+# Compile src into a library in install/lib (default: all optimisations enabled)
 install/lib/libthread.a: $(SRC)
 	mkdir -p install/lib
-	$(CC) $(CFLAGS) -c $(SRC)
+	$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE -c $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
@@ -103,7 +103,7 @@ install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a
 	mkdir -p install/bin
-	$(CC) $(CFLAGS) $< install/lib/libthread.a -o $@
+	$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE $< install/lib/libthread.a -o $@
 
 pthreads: $(TESTS)
 	@for t in $(TESTS); do \
