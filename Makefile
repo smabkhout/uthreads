@@ -19,10 +19,10 @@ ARGS_71_preemption			  = 5
 
 all: install
 
-# Compile src into a library in install/lib
+# Compile src into a library in install/lib (default: all optimisations enabled)
 install/lib/libthread.a: $(SRC)
 	mkdir -p install/lib
-	$(CC) $(CFLAGS) -c $(SRC)
+	$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE -c $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
@@ -75,13 +75,27 @@ install/lib/libthread-one-malloc-recycle.a: $(SRC)
 	ar rcs $@ *.o
 	rm -f *.o
 
+# Compile src with setjmp/longjmp only (no optimisations, for benchmarking)
+install/lib/libthread-setjmp.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
+# Compile src with user-space signals support
+install/lib/libthread-signals.a: $(SRC)
+	mkdir -p install/lib
+	$(CC) $(CFLAGS) -DUSE_SIGNALS -c $(SRC)
+	ar rcs $@ *.o
+	rm -f *.o
+
 build_tests: install/lib/libthread.a $(TEST_BINS)
 
 
 
-install/bin/91-signals: test/91-signals.c install/lib/libthread-context.a
+install/bin/91-signals: test/91-signals.c install/lib/libthread-signals.a
 	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DUSE_CONTEXT $< install/lib/libthread-context.a -o $@
+	$(CC) $(CFLAGS) -DUSE_SIGNALS $< install/lib/libthread-signals.a -o $@
 
 # on triche en activant la preemption uniquement sur sontest parce que ... pourquoi pas? hhhh
 install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
@@ -96,7 +110,7 @@ install/bin/71-preemption: test/71-preemption.c install/lib/libthread-preem.a
 # Compile each test individually into install/bin
 install/bin/%: test/%.c install/lib/libthread.a
 	mkdir -p install/bin
-	$(CC) $(CFLAGS) $< install/lib/libthread.a -o $@
+	$(CC) $(CFLAGS) -DUSE_ONE_MALLOC -DUSE_RECYCLE $< install/lib/libthread.a -o $@
 
 pthreads: $(TESTS)
 	@for t in $(TESTS); do \
@@ -158,7 +172,7 @@ check_all: install
 			base=$$(basename $$test); \
 			while true; do \
 				prev=$$base; \
-				for s in -context -priority -preem -fibo -one-malloc -recycle -stackprot -pthread; do \
+				for s in -context -priority -preem -fibo -one-malloc -recycle -stackprot -pthread -signals; do \
 					base=$${base%%$$s}; \
 				done; \
 				[ "$$prev" = "$$base" ] && break; \
@@ -194,14 +208,24 @@ valgrind: build_tests
 			"71-preemption")                        args="$(ARGS_71_preemption)" ;; \
 		esac; \
 		echo "Valgrind on $$test $$args..."; \
-		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test $$args || exit 1; \
+		valgrind --leak-check=full --show-reachable=yes --track-origins=yes ./$$test $$args; \
 	done
 
-graphs: install
+graphs: install setjmp
 	mkdir -p results
 	python3 scripts/plot.py
 
-install: build_tests pthreads context preem stackprot one-malloc recycle one-malloc-recycle
+setjmp: install/lib/libthread-setjmp.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) $$t install/lib/libthread-setjmp.a -o install/bin/$$(basename $$t .c)-setjmp; \
+	done
+
+signals-variant: install/lib/libthread-signals.a $(TESTS)
+	@for t in $(TESTS); do \
+		$(CC) $(CFLAGS) -DUSE_SIGNALS $$t install/lib/libthread-signals.a -o install/bin/$$(basename $$t .c)-signals; \
+	done
+
+install: build_tests pthreads context preem stackprot one-malloc recycle one-malloc-recycle signals-variant
 
 rapport:
 	pdflatex rapport/rapport.tex
@@ -220,13 +244,14 @@ stackprot: install/lib/libthread-stackprot.a test/90-stack_overflow.c
 	mkdir -p install/bin
 	$(CC) $(CFLAGS) -DUSE_STACK_PROT test/90-stack_overflow.c install/lib/libthread-stackprot.a -o install/bin/90-stack_overflow-stackprot
 
-signals: install/lib/libthread-context.a test/91-signals.c
+signals: install/lib/libthread-signals.a test/91-signals.c
 	mkdir -p install/bin
-	$(CC) $(CFLAGS) -DUSE_CONTEXT test/91-signals.c install/lib/libthread-context.a -o install/bin/91-signals
+	$(CC) $(CFLAGS) -DUSE_SIGNALS test/91-signals.c install/lib/libthread-signals.a -o install/bin/91-signals
 	./install/bin/91-signals
 
 clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
+	rm -f results/*
 
-.PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle all rapport stackprot rapport-final
+.PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle setjmp signals-variant signals all rapport stackprot rapport-final

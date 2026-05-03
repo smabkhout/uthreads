@@ -90,9 +90,11 @@ struct thread_s {
 #else
   jmp_buf env;
 #endif
+#ifdef USE_SIGNALS
   uint32_t pending_signals;
   void (*sig_handlers[32])(int);
   uint32_t sigwait_mask;
+#endif
   void *stack;
   int valgrind_stackid; // pour valgrind
   enum threadState state;
@@ -279,10 +281,12 @@ void thread_init() {
   currentThread->recursive_create_count = 0;
 #endif
 
+#ifdef USE_SIGNALS
   currentThread->pending_signals = 0;
   for (int i = 0; i < 32; i++)
     currentThread->sig_handlers[i] = NULL;
   currentThread->sigwait_mask = 0;
+#endif
 
 #ifdef USE_CONTEXT
   if (getcontext(&currentThread->context) == -1) {
@@ -312,6 +316,7 @@ thread_t thread_self() {
   return (thread_t)currentThread;
 }
 
+#ifdef USE_SIGNALS
 static void deliver_pending_signals() { // on appelle les handlers si on les trouve
   if (!currentThread)
     return;
@@ -321,12 +326,14 @@ static void deliver_pending_signals() { // on appelle les handlers si on les tro
   while (pending) {
     int sig = 0;
     while (!((pending >> sig) & 1)) sig++;
-
-    // on efface ce signal car on va appeler son handler
-    currentThread->pending_signals &= ~((uint32_t)1 << sig);
     pending &= ~((uint32_t)1 << sig);
-    if (currentThread->sig_handlers[sig])
+
+    // on ne consomme le signal que s'il y a un handler enregistre
+    // sinon on le laisse dans pending_signals pour que thread_sigwait puisse le voir
+    if (currentThread->sig_handlers[sig]) {
+      currentThread->pending_signals &= ~((uint32_t)1 << sig);
       currentThread->sig_handlers[sig](sig);
+    }
   }
 }
 
@@ -378,9 +385,12 @@ int thread_sigwait(uint32_t set, int *signo) {
   if (signo) *signo = sig;
   return 0;
 }
+#endif /* USE_SIGNALS */
 
 static void thread_wrapper(void) {
+#ifdef USE_SIGNALS
   deliver_pending_signals();
+#endif
   thread_s *thread = currentThread;
   void *retval = thread->func(thread->arg);
   thread_exit(retval);
@@ -523,10 +533,12 @@ int thread_create(thread_t *createdThread, void *(*func)(void *), void *arg) {
   newThread->signals_blocked = 0;
 #endif
 
+#ifdef USE_SIGNALS
   newThread->pending_signals = 0;
   for (int i = 0; i < 32; i++)
     newThread->sig_handlers[i] = NULL;
   newThread->sigwait_mask = 0;
+#endif
 
 #ifdef USE_CONTEXT
   if (getcontext(&newThread->context) == -1) {
@@ -585,7 +597,9 @@ TAILQ_FOREACH(it, &readyQueue, entries) {
   thread_s *oldThread = currentThread;
   // cas si il y a personne d'autre
   if (init_done == 0 || TAILQ_EMPTY(&readyQueue)) {
+#ifdef USE_SIGNALS
     deliver_pending_signals();
+#endif
     return 0;
   }
   thread_s *nextThread = TAILQ_FIRST(&readyQueue);
@@ -606,7 +620,9 @@ TAILQ_FOREACH(it, &readyQueue, entries) {
     longjmp(nextThread->env, 1);
   }
 #endif
+#ifdef USE_SIGNALS
   deliver_pending_signals();
+#endif
 #ifdef USE_PREEM
   unlock_preemption();
 #endif
