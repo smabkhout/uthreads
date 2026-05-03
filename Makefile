@@ -252,5 +252,6 @@ signals: install/lib/libthread-signals.a test/91-signals.c
 clean:
 	rm -f install/bin/* install/lib/* *.o
 	rm -f *.aux *.log *.pdf *.toc
+	rm -f results/*
 
 .PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle setjmp signals-variant signals all rapport stackprot rapport-final
