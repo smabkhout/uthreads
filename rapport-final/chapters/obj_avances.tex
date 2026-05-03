@@ -68,21 +68,73 @@ Activé par la macro \texttt{USE\_PRIORITY}, ce système exploite le champ \text
 \end{itemize}
 
 
-\subsection{Protection de la pile (\textit{Stack Guard}) ANAS GAD HADI + test}
+\subsection{Protection de la pile (\textit{Stack Guard})}
 
-Afin de prévenir les corruptions de mémoire silencieuses causées par des dépassements de pile (\textit{stack overflow}), nous avons implémenté un mécanisme de protection matériel et logiciel.
+Afin de prévenir les corruptions de mémoire silencieuses causées par des dépassements de pile (\textit{stack overflow}), nous avons implémenté un mécanisme de protection de pile.
 
 \subsubsection{Implémentation}
 
-Activé par la macro \texttt{USE\_STACK\_PROT}, ce mécanisme s'articule autour de trois éléments clés :
+Activé par la macro \texttt{USE\_STACK\_PROT}, ce mécanisme se base autour de trois éléments clés :
 
 \begin{itemize}
-    \item \textbf{Page de garde} : Lors de l'allocation de l'espace d'un thread (via \texttt{posix\_memalign} pour respecter l'alignement matériel), une page mémoire située à l'extrémité de la pile est rendue totalement inaccessible en utilisant l'appel système \texttt{mprotect} avec le drapeau \texttt{PROT\_NONE}.
+    \item \textbf{Page de garde} : Lors de l'allocation de l'espace d'un thread (via \texttt{posix\_memalign} pour respecter l'alignement de pages), une page mémoire située à l'extrémité de la pile est rendue totalement inaccessible en utilisant l'appel système \texttt{mprotect} avec le flag \texttt{PROT\_NONE}.
     \item \textbf{Interception du signal} : Si la pile d'un thread déborde et tente d'accéder à cette page de garde, le système génère une erreur de segmentation (\texttt{SIGSEGV}). Un gestionnaire personnalisé (\texttt{segfault\_handler}) intercepte ce signal pour afficher un message de diagnostic clair avant d'interrompre le programme.
-    \item \textbf{Pile alternative} : Pour garantir que le gestionnaire de signal puisse s'exécuter même si la pile du thread fautif est intégralement consommée, il s'appuie sur une pile de secours indépendante, configurée lors de l'initialisation via \texttt{sigaltstack}.
+    \item \textbf{Pile alternative} : Pour garantir que le gestionnaire de signal puisse s'exécuter même si la pile du thread concerné est intégralement consommée, il s'appuie sur une pile de secours indépendante, configurée lors de l'initialisation via \texttt{sigaltstack}.
 \end{itemize}
 
-\subsection{fonction de sychronisation(\textit{semaphore}) ANAS GAD HADI + test}
+\subsubsection{Test : \texttt{90-stack\_overflow.c}}
+Ce test cherche à provoquer volontairement un dépassement de pile pour vérifier que notre bibliothèque réagit proprement
+ au lieu de corrompre la mémoire des autres threads ou de "crasher" sans explication.
+\begin{itemize}
+\item \textbf{Le mécanisme} : Le test utilise une fonction faisant une récursion infinie.
+\item \textbf{Le comportement attendu} : Sans protection, le thread aurait écraser les données d'autres threads 
+(puisque la mémoire alloué par malloc est continue). Avec la protection, le programme doit est stoppé dès que la 
+page de garde est atteinte, avec un message d'erreur affiché par le gestionnaire de signal.
+\end{itemize}
+
+\subsection{Fonctions de Synchronisation}
+L'objectif de principale de ces fonctions est de permettre une coordination efficace entre les threads tout en 
+garantissant l'intégrité des données partagées, même sous préemption.
+
+\subsubsection{Mutex}
+Notre implémentation des mutex a été optimisée pour passer utiliser une attente passive, 
+garantissant qu'un thread bloqué ne consomme aucun cycle CPU.
+\begin{itemize}
+    \item \textbf{Atomicité} : Nous utilisons l'instruction atomique \texttt{\_\_sync\_lock\_test\_and\_set} pour tenter 
+    d'acquérir le verrou. Cette opération prévient toute \textit{race condition} lors de l'accès au 
+    flag \texttt{dummy}.
+    \item \textbf{Transfert Direct} : Pour éviter des "vols" de verrou, la fonction \texttt{unlock} ne libère pas le flag si des threads attendent. 
+    Elle transfère directement la propriété au premier thread de la \texttt{waitingQueue}.
+\end{itemize}
+
+\subsubsection{Sémaphores}
+Le sémaphore a été implémenté, dans un temps ultérieur, comme une généralisation du mutex.
+\begin{itemize}
+    \item \textbf{Gestion des jetons} : Si la valeur est supérieure à zéro, le thread décrémente le compteur de façon 
+    atomique via \texttt{\_\_sync\_fetch\_and\_sub} et continue son exécution.
+    \item \textbf{Blocage passif} : Si aucune ressource n'est disponible, le thread est déplacé vers une file d'attente
+     spécifique et suspendu jusqu'à ce qu'un appel à \texttt{post} vienne le réveiller.
+\end{itemize}
+
+\subsubsection{Variables de Condition (\textit{CondVar})}
+Elles permettent aux threads d'attendre qu'une condition logique spécifique devienne vraie.
+\begin{itemize}
+    \item \textbf{Atomicité du Wait} : La fonction \texttt{thread\_cond\_wait} relâche le mutex associé et bloque 
+    le thread de manière atomique par rapport à l'ordonnanceur. Au réveil, le thread doit impérativement ré-acquérir l
+    e mutex avant de poursuivre.
+    \item \textbf{Signal et Broadcast} : Nous avons implémenté \texttt{signal} pour réveiller un seul thread,
+     et \texttt{broadcast} pour libérer tous les threads en attente d'un changement d'état global (barrière par exemple).
+\end{itemize}
+
+\subsubsection{Validation par les Tests}
+L'ensemble de ces primitives a été validé des tests :
+\begin{itemize}
+    \item \textbf{Tests 61-65 (fournis)} : Validation du comportement binaire et de l'exclusion mutuelle des mutex, 
+    avec des performances intéressantes.
+    \item \textbf{Test 65 (\textit{semaphore})} : Vérification de la synchronisation avec un compteur et résistance aux fortes sollicitation.
+\end{itemize}
+
+
 
 \subsection{Détection de DEADLOCK}
 
