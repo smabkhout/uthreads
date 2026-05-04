@@ -98,7 +98,7 @@ L'objectif de principale de ces fonctions est de permettre une coordination effi
 garantissant l'intégrité des données partagées, même sous préemption.
 
 \subsubsection{Mutex}
-Notre implémentation des mutex a été optimisée pour passer utiliser une attente passive, 
+Notre implémentation des mutex a été optimisée pour utiliser une attente passive, 
 garantissant qu'un thread bloqué ne consomme aucun cycle CPU.
 \begin{itemize}
     \item \textbf{Atomicité} : Nous utilisons l'instruction atomique \texttt{\_\_sync\_lock\_test\_and\_set} pour tenter 
