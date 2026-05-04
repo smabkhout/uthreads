@@ -62,13 +62,7 @@ Notre bibliothèque opère entièrement en espace utilisateur, supprimant ces
 transitions coûteuses au prix d'un ordonnancement coopératif.
 
 Ces benchmarks sont toutefois réalisés sur un \textbf{seul cœur}, ce qui défavorise
-structurellement les pthreads. Sur une charge de travail réellement parallèle
-et CPU-intensive, les pthreads surpasseraient notre bibliothèque : ils peuvent
-exploiter les \textbf{multiples cœurs} du processeur simultanément, tandis que
-nos threads utilisateur s'exécutent tous sur le même cœur et ne bénéficient
-d'aucun parallélisme réel.
-
-Pour le confirmer, les graphes suivants répètent les mêmes mesures \textbf{sans épingler
+structurellement les pthreads. Pour le confirmer, les graphes suivants répètent les mêmes mesures \textbf{sans épingler
 le processus sur un seul cœur} (sans \texttt{taskset}). Les pthreads voient leurs
 performances nettement améliorées et se rapprochent significativement de notre
 variante \texttt{ucontext}, illustrant l'impact du parallélisme noyau dès que
