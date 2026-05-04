@@ -68,6 +68,24 @@ exploiter les \textbf{multiples cœurs} du processeur simultanément, tandis que
 nos threads utilisateur s'exécutent tous sur le même cœur et ne bénéficient
 d'aucun parallélisme réel.
 
+Pour le confirmer, les graphes suivants répètent les mêmes mesures \textbf{sans épingler
+le processus sur un seul cœur} (sans \texttt{taskset}). Les pthreads voient leurs
+performances nettement améliorées et se rapprochent significativement de notre
+variante \texttt{ucontext}, illustrant l'impact du parallélisme noyau dès que
+le système d'exploitation peut librement distribuer les threads sur plusieurs cœurs.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/21-create-many-no-taskset.png}
+    \caption{Création/destruction de $n$ threads sans \texttt{taskset} : pthreads vs bibliothèque utilisateur.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{rapport-final/images/31-switch-many-no-taskset.png}
+    \caption{Changements de contexte sans \texttt{taskset} : pthreads vs bibliothèque utilisateur.}
+\end{figure}
+
 \subsection{Comparaison \texttt{ucontext} vs \texttt{setjmp/longjmp}}
 
 En retirant les pthreads du graphe, les différences entre nos variantes deviennent visibles.

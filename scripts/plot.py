@@ -4,7 +4,7 @@ import math
 import matplotlib.pyplot as plt
 
 BIN_DIR = "./install/bin"
-TASKSET_CMD = ["taskset", "-c", "0"]
+#TASKSET_CMD = ["taskset", "-c", "8"]
 
 # (test name, extra fixed args passed after n_threads)
 TESTS = [
@@ -20,7 +20,8 @@ RUNS = 10
 def run_test(binary, n, extra_args):
     try:
         result = subprocess.run(
-            TASKSET_CMD + [binary, str(n)] + extra_args,
+            #TASKSET_CMD + [binary, str(n)] + extra_args,
+            [binary, str(n)] + extra_args,
             capture_output=True,
             text=True
         )
@@ -54,8 +55,8 @@ def main():
 
         variants = {
             "setjmp/longjmp":       os.path.join(BIN_DIR, test + "-setjmp"),
-            #"ucontext":             os.path.join(BIN_DIR, test + "-context"),
-            #"pthreads":             os.path.join(BIN_DIR, test + "-pthread"),
+            "ucontext":             os.path.join(BIN_DIR, test + "-context"),
+            "pthreads":             os.path.join(BIN_DIR, test + "-pthread"),
             "one-malloc":           os.path.join(BIN_DIR, test + "-one-malloc"),
             "recycle":              os.path.join(BIN_DIR, test + "-recycle"),
             "one-malloc + recycle": os.path.join(BIN_DIR, test + "-one-malloc-recycle"),
