@@ -1,1 +1,9 @@
 \section{Introduction}
+Ce projet vise à construire une bibliothèque de threads en espace utilisateur,
+   offrant une interface proche des \texttt{pthreads} tout en s'exécutant sur un
+   seul thread noyau. L'intérêt est double : réduire les coûts d'ordonnancement 
+  en évitant les transitions noyau, et expérimenter concrètement le changement  
+  de contexte via différentes manières (\texttt{ucontext} ou \texttt{setjmp}/\texttt{longjmp}). Ce
+  rapport présente nos choix d'implémentation, une comparaison de performances
+  entre les différentes variantes, ainsi que les objectifs avancés réalisés.
+
