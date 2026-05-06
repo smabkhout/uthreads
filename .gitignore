@@ -16,3 +16,13 @@ results/
 .venv/
 __pycache__/
 *.pyc
+
+
+*.aux
+*.log
+*.pdf
+*.toc
+*.nav
+*.snm
+*.out
+*.vrb

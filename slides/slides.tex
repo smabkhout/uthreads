@@ -1,0 +1,40 @@
+\documentclass[aspectratio=169,12pt]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,shapes.geometric,positioning,calc,backgrounds,fit,decorations.pathreplacing}
+
+\usetheme{Boadilla}
+\usecolortheme{whale}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\title[Threads en espace utilisateur]{Threads en espace utilisateur}
+\subtitle{Rapport final --- Projet Système}
+\author[Mabkhout \textperiodcentered\ Migaou \textperiodcentered\ Benbaki \textperiodcentered\ Dammou]{
+  MABKHOUT Salah-Eddine \and MIGAOU Mohamed Aziz \\
+  BENBAKI Anas \and DAMMOU Adam
+}
+\institute{ENSEIRB-MATMECA}
+\date{Année 2025--2026}
+
+\begin{document}
+
+%--- Page de titre ---
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%--- Plan ---
+\begin{frame}{Plan}
+  \tableofcontents
+\end{frame}
+
+\input{slides/part_setjmp}
+\input{slides/part_preemption}
+\input{slides/part_signaux}
+\input{slides/part_synchro}
+
+\end{document}

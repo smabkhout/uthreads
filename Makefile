@@ -233,6 +233,9 @@ rapport:
 rapport-final:
 	pdflatex rapport-final/rapport-final.tex
 
+slides:
+	pdflatex slides/slides.tex
+
 #lib with stack prot support
 install/lib/libthread-stackprot.a: $(SRC)
 	mkdir -p install/lib
@@ -251,7 +254,8 @@ signals: install/lib/libthread-signals.a test/91-signals.c
 
 clean:
 	rm -f install/bin/* install/lib/* *.o
-	rm -f *.aux *.log *.pdf *.toc
+	rm -f *.aux *.log *.pdf *.toc *.nav *.snm *.out *.vrb
+	rm -f slides/*.aux slides/*.log slides/*.pdf slides/*.toc slides/*.nav slides/*.snm slides/*.out slides/*.vrb
 	rm -f results/*
 
-.PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle setjmp signals-variant signals all rapport stackprot rapport-final
+.PHONY: all clean graphs check valgrind install build_tests pthreads context preem one-malloc recycle one-malloc-recycle setjmp signals-variant signals all rapport stackprot rapport-final slides slides

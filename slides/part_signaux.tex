@@ -1,0 +1,82 @@
+%==========================================================
+\section{Signaux inter-threads et détection de deadlocks}
+%==========================================================
+
+% --- User-level signals ---
+\begin{frame}{Signaux inter-threads en espace utilisateur}
+\centering
+\begin{tikzpicture}[
+  th/.style={draw, rounded corners=3pt, fill=blue!20,
+             minimum width=2.8cm, minimum height=2.8cm, font=\footnotesize, align=center},
+  field/.style={draw, fill=gray!10, minimum width=2.6cm,
+                minimum height=0.5cm, font=\scriptsize},
+  arr/.style={->, >=Stealth, thick},
+]
+  % Thread A
+  \node[th] (ta) at (-3.5, 0) {};
+  \node[font=\small\bfseries] at (-3.5, 1.1) {Thread A};
+  \node[font=\scriptsize, align=center] at (-3.5, 0.2) {\texttt{thread\_kill(B, sig)}\\$\Downarrow$\\\texttt{pending\_signals}\\set bit $\mathit{sig}$};
+
+  % Thread B
+  \node[th] (tb) at (3.5, 0) {};
+  \node[font=\small\bfseries] at (3.5, 1.1) {Thread B};
+  \node[field] at (3.5,  0.35) {\texttt{pending\_signals}};
+  \node[field] at (3.5, -0.20) {\texttt{sig\_handlers[32]}};
+  \node[field] at (3.5, -0.75) {\texttt{sigwait\_mask}};
+
+  % kill arrow
+  \draw[arr, red!70] (ta.east) -- (tb.west)
+    node[midway, above, font=\scriptsize] {\texttt{thread\_kill}};
+
+  % Delivery box
+  \node[draw, fill=orange!20, rounded corners=3pt,
+        minimum width=3.5cm, minimum height=0.7cm, font=\footnotesize, align=center]
+    (del) at (0, -2.2)
+    {\texttt{deliver\_pending\_signals()}\\appelé après chaque \texttt{thread\_yield()}};
+
+  \draw[arr, blue!60] (tb.south) |- (del.east);
+
+  % thread_sigwait
+  \node[draw, fill=green!15, rounded corners=3pt,
+        font=\scriptsize, align=center] at (3.5, -3.3)
+    {\texttt{thread\_sigwait} : bloque passivement\\jusqu'à réception du signal};
+\end{tikzpicture}
+\end{frame}
+
+% --- Deadlock detection ---
+\begin{frame}{Détection de deadlock}
+\centering
+\begin{tikzpicture}[
+  th/.style={draw, circle, fill=blue!20, minimum size=1.5cm, font=\small\bfseries, align=center},
+  arr/.style={->, >=Stealth, thick, red!70},
+  lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
+]
+  \node[th] (th0) at (0,  0)   {th0};
+  \node[font=\tiny, gray] at (0, -0.9) {(main)};
+  \node[th] (th1) at (4.5,  0) {th1};
+  \node[th] (th2) at (2.25, -2.8) {th2};
+
+  \draw[arr] (th0) to[bend left=20] node[lbl, above] {\texttt{join(th1)}} (th1);
+  \draw[arr] (th1) to[bend left=20] node[lbl, right] {\texttt{join(th2)}} (th2);
+  \draw[arr] (th2) to[bend left=20] node[lbl, left]  {\texttt{join(th0)}} (th0);
+
+  % Empty readyQueue
+  \node[draw, fill=orange!20, rounded corners=3pt,
+        minimum width=4.2cm, minimum height=0.65cm, font=\small]
+    (rq) at (2.25, -4.5) {\texttt{readyQueue} $= \emptyset$};
+
+  \draw[->, >=Stealth, gray, dashed] (th0.south) -- (rq.north);
+  \draw[->, >=Stealth, gray, dashed] (th1.south) -- (rq.north);
+  \draw[->, >=Stealth, gray, dashed] (th2.south) -- (rq.north);
+
+  % EDEADLK
+  \node[draw, fill=red!25, rounded corners=3pt,
+        minimum width=3.8cm, minimum height=0.65cm, font=\small\bfseries]
+    (dead) at (8.0, -2.5) {\texttt{return EDEADLK}};
+
+  \draw[->, >=Stealth, very thick, red!70] (rq.east) -| (dead.south);
+
+  \node[font=\scriptsize, gray, align=center] at (8.0, -4.0)
+    {detecte dans \texttt{thread\_join}};
+\end{tikzpicture}
+\end{frame}

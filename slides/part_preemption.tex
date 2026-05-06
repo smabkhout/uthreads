@@ -1,0 +1,96 @@
+%==========================================================
+\section{Préemption et ordonnancement}
+%==========================================================
+
+% --- State machine ---
+\begin{frame}{Machine d'états d'un thread}
+\centering
+\begin{tikzpicture}[
+  state/.style={draw, circle, minimum size=1.8cm, font=\small\bfseries, align=center, thick},
+  lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
+  ->, >=Stealth, thick,
+]
+  \node[state, fill=green!20]  (ready)   at (0, 0)    {READY};
+  \node[state, fill=blue!20]   (running) at (4, 0)    {RUNNING};
+  \node[state, fill=orange!20] (blocked) at (4, -3.2) {BLOCKED};
+  \node[state, fill=red!20]    (term)    at (8, 0)    {TERMINATED};
+
+  \draw (ready.east) -- (running.west)
+    node[lbl, midway, above] {scheduler};
+
+  \draw (running.north) to[bend left=40]
+    node[lbl, above] {\texttt{thread\_yield()}} (ready.north);
+
+  \draw (running.south) -- (blocked.north)
+    node[lbl, midway, right] {\texttt{join} / \texttt{lock} / \texttt{sem\_wait}};
+
+  \draw (blocked.west) to[bend right=30]
+    node[lbl, left] {déblocage} (ready.south);
+
+  \draw (running.east) -- (term.west)
+    node[lbl, midway, above] {\texttt{thread\_exit()}};
+\end{tikzpicture}
+\end{frame}
+
+% --- Preemption ---
+\begin{frame}{Préemption (\texttt{USE\_PREEM})}
+\centering
+\begin{tikzpicture}[
+  bar/.style={draw, minimum height=0.8cm, font=\small},
+]
+  \draw[->, >=Stealth, thick] (0, 0) -- (11, 0) node[right] {temps};
+  \node[left, font=\small] at (0, 0.4) {CPU};
+
+  \node[bar, fill=blue!25,   minimum width=4cm]  at (2.0, 0.4) {Thread A};
+  \node[bar, fill=orange!25, minimum width=3cm]  at (6.5, 0.4) {Thread B};
+  \node[bar, fill=blue!25,   minimum width=2cm]  at (9.5, 0.4) {Thread A};
+
+  \draw[red!80, very thick, ->] (4.0, 2.2) -- (4.0, 0.85)
+    node[near start, right, font=\footnotesize, red!80] {\texttt{SIGVTALRM}};
+  \draw[red!80, dashed, thin] (4.0, 0) -- (4.0, 2.5);
+
+  \draw[red!80, very thick, ->] (8.0, 2.2) -- (8.0, 0.85);
+  \draw[red!80, dashed, thin] (8.0, 0) -- (8.0, 2.5);
+
+  \draw[<->, gray, thin] (4.0, 2.4) -- (8.0, 2.4)
+    node[midway, above, font=\scriptsize] {\texttt{setitimer} 10 ms};
+
+  \node[draw, fill=yellow!25, rounded corners=3pt,
+        font=\scriptsize, align=center] at (5.5, -1.1)
+    {\texttt{signals\_blocked > 0} $\Rightarrow$ handler ignoré (section critique protégée)};
+\end{tikzpicture}
+\end{frame}
+
+% --- Priority + aging ---
+\begin{frame}{Priorités dynamiques et vieillissement (\texttt{USE\_PRIORITY})}
+\centering
+\begin{tikzpicture}[
+  tbox/.style={draw, rounded corners=2pt, minimum width=1.6cm,
+               minimum height=0.65cm, font=\footnotesize\bfseries},
+  arr/.style={->, >=Stealth, thick, blue!60},
+  lbl/.style={font=\scriptsize},
+]
+  \node[font=\small\bfseries] at (1.2, 2.5) {Avant \texttt{thread\_yield()}};
+  \node[tbox, fill=blue!35] at (0.0, 1.7) {prio = 3};
+  \node[tbox, fill=blue!22] at (1.7, 1.7) {prio = 6};
+  \node[tbox, fill=blue!12] at (3.4, 1.7) {prio = 9};
+  \node[tbox, fill=blue!6]  at (5.1, 1.7) {prio = 10};
+
+  \draw[arr] (5.9, 1.7) -- (6.7, 1.7) node[midway, above, lbl] {yield};
+
+  \node[font=\small\bfseries] at (9.5, 2.5) {Après \texttt{thread\_yield()}};
+  \node[tbox, fill=blue!35] at (7.0, 1.7) {prio = 2};
+  \node[tbox, fill=blue!22] at (8.7, 1.7) {prio = 5};
+  \node[tbox, fill=blue!12] at (10.4,1.7) {prio = 8};
+  \node[tbox, fill=orange!35] at (12.1,1.7) {prio = 10};
+  \node[lbl, orange!70!black, align=center] at (12.1,1.1) {thread\\remis à 10};
+
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}, gray]
+    (6.6, 1.35) -- (10.8, 1.35)
+    node[midway, below=7pt, lbl, gray] {$-1$ à chaque yield (vieillissement)};
+
+  \node[draw, fill=green!15, rounded corners=3pt, font=\footnotesize, align=center]
+    at (6.0, -0.4)
+    {Aucune famine : un thread attend longtemps $\Rightarrow$ prio $\to$ 0 $\Rightarrow$ tête de file};
+\end{tikzpicture}
+\end{frame}
