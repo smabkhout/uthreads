@@ -77,59 +77,59 @@
 \begin{tikzpicture}[scale=0.78]
 
   % ── POSIX side (left) ───────────────────────────────────────────────
-  \node[font=\small\bfseries, orange!70!black] at (-3.2, 3.2) {Masque POSIX (\texttt{sigset\_t})};
+  \node[font=\small\bfseries, orange!70!black] at (-4.2, 3.2) {Masque POSIX (\texttt{sigset\_t})};
 
   % 32-bit integer visual (8 groups of 4 bits)
   \foreach \i in {0,...,7} {
-    \fill[orange!20] ({-5.8 + \i*0.72}, 2.4) rectangle ({-5.8 + \i*0.72 + 0.66}, 2.9);
-    \draw[orange!50] ({-5.8 + \i*0.72}, 2.4) rectangle ({-5.8 + \i*0.72 + 0.66}, 2.9);
-    \node[font=\tiny] at ({-5.8 + \i*0.72 + 0.33}, 2.65) {\texttt{xxxx}};
+    \fill[orange!20] ({-6.8 + \i*0.72}, 2.4) rectangle ({-6.8 + \i*0.72 + 0.66}, 2.9);
+    \draw[orange!50] ({-6.8 + \i*0.72}, 2.4) rectangle ({-6.8 + \i*0.72 + 0.66}, 2.9);
+    \node[font=\tiny] at ({-6.8 + \i*0.72 + 0.33}, 2.65) {\texttt{xxxx}};
   }
   % bit 0 and bit 31 labels
-  \node[font=\tiny, gray] at (-5.8+0.33,  2.25) {0};
-  \node[font=\tiny, gray] at (-5.8+7*0.72+0.33, 2.25) {31};
-  \node[font=\tiny]       at (-3.2, 2.05) {\texttt{sigset\_t} = entier 32 bits (POSIX)};
+  \node[font=\tiny, gray] at (-6.8+0.33,  2.25) {0};
+  \node[font=\tiny, gray] at (-6.8+7*0.72+0.33, 2.25) {31};
+  \node[font=\tiny]       at (-4.2, 2.05) {\texttt{sigset\_t} = entier 32 bits (POSIX)};
 
   % sigprocmask box
   \node[draw, fill=red!15, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.65cm, font=\scriptsize]
-    (spm) at (-3.2, 1.2) {\texttt{sigprocmask()} — syscall};
-  \node[font=\tiny, gray, align=center] at (-3.2, 0.52)
+    (spm) at (-4.2, 1.2) {\texttt{sigprocmask()} - syscall};
+  \node[font=\tiny, gray, align=center] at (-4.2, 0.52)
     {modifie le masque\\$\Rightarrow$ 1 appel noyau à chaque usage};
 
   % stored in kernel
   \node[draw, fill=orange!20, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.55cm, font=\scriptsize]
-    at (-3.2, -0.25) {stocké dans \texttt{task\_struct} (noyau)};
+    at (-4.2, -0.25) {stocké dans \texttt{task\_struct} (noyau)};
 
   % ── separator ───────────────────────────────────────────────────────
   \draw[gray!50, thick, dashed] (0, -0.85) -- (0, 3.5);
   \node[font=\footnotesize\itshape, gray] at (0, -1.1) {vs};
 
   % ── OUR side (right) ────────────────────────────────────────────────
-  \node[font=\small\bfseries, blue!65] at (3.2, 3.2) {Notre implémentation (\texttt{uint32\_t})};
+  \node[font=\small\bfseries, blue!65] at (4.2, 3.2) {Notre implémentation (\texttt{uint32\_t})};
 
   % 32-bit integer visual (8 groups of 4 bits)
   \foreach \i in {0,...,7} {
-    \fill[blue!20] ({0.6 + \i*0.72}, 2.4) rectangle ({0.6 + \i*0.72 + 0.66}, 2.9);
-    \draw[blue!40]  ({0.6 + \i*0.72}, 2.4) rectangle ({0.6 + \i*0.72 + 0.66}, 2.9);
-    \node[font=\tiny] at ({0.6 + \i*0.72 + 0.33}, 2.65) {\texttt{xxxx}};
+    \fill[blue!20] ({1.6 + \i*0.72}, 2.4) rectangle ({1.6 + \i*0.72 + 0.66}, 2.9);
+    \draw[blue!40]  ({1.6 + \i*0.72}, 2.4) rectangle ({1.6 + \i*0.72 + 0.66}, 2.9);
+    \node[font=\tiny] at ({1.6 + \i*0.72 + 0.33}, 2.65) {\texttt{xxxx}};
   }
-  \node[font=\tiny, gray] at (0.6+0.33,       2.25) {0};
-  \node[font=\tiny, gray] at (0.6+7*0.72+0.33,2.25) {31};
-  \node[font=\tiny]       at (3.2, 2.05) {\texttt{uint32\_t pending\_signals}};
+  \node[font=\tiny, gray] at (1.6+0.33,       2.25) {0};
+  \node[font=\tiny, gray] at (1.6+7*0.72+0.33,2.25) {31};
+  \node[font=\tiny]       at (4.2, 2.05) {\texttt{uint32\_t pending\_signals}};
 
   % no syscall
   \node[draw, fill=green!18, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.65cm, font=\scriptsize]
-    at (3.2, 1.2) {opération bit à bit — 0 syscall};
-  \node[font=\tiny, gray, align=center] at (3.2, 0.52)
+    at (4.2, 1.2) {opération bit à bit - 0 syscall};
+  \node[font=\tiny, gray, align=center] at (4.2, 0.52)
     {modifié avec \texttt{|=} et \texttt{\&=}\\entièrement en espace utilisateur};
 
   % stored in thread_s
   \node[draw, fill=blue!15, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.55cm, font=\scriptsize]
-    at (3.2, -0.25) {stocké dans \texttt{thread\_s} (user)};
+    at (4.2, -0.25) {stocké dans \texttt{thread\_s} (user)};
 
   % ── Why uint32_t and not int ────────────────────────────────────────
   \node[draw, fill=gray!10, rounded corners=4pt,
