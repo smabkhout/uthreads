@@ -94,13 +94,13 @@
   \node[draw, fill=red!15, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.65cm, font=\scriptsize]
     (spm) at (-4.2, 1.2) {\texttt{sigprocmask()} - syscall};
-  \node[font=\tiny, gray, align=center] at (-4.2, 0.52)
+  \node[font=\tiny, gray, align=center] at (-4.2, 0.32)
     {modifie le masque\\$\Rightarrow$ 1 appel noyau à chaque usage};
 
   % stored in kernel
   \node[draw, fill=orange!20, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.55cm, font=\scriptsize]
-    at (-4.2, -0.25) {stocké dans \texttt{task\_struct} (noyau)};
+    at (-4.2, -0.45) {stocké dans \texttt{task\_struct} (noyau)};
 
   % ── separator ───────────────────────────────────────────────────────
   \draw[gray!50, thick, dashed] (0, -0.85) -- (0, 3.5);
@@ -123,21 +123,21 @@
   \node[draw, fill=green!18, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.65cm, font=\scriptsize]
     at (4.2, 1.2) {opération bit à bit - 0 syscall};
-  \node[font=\tiny, gray, align=center] at (4.2, 0.52)
+  \node[font=\tiny, gray, align=center] at (4.2, 0.32)
     {modifié avec \texttt{|=} et \texttt{\&=}\\entièrement en espace utilisateur};
 
   % stored in thread_s
   \node[draw, fill=blue!15, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.55cm, font=\scriptsize]
-    at (4.2, -0.25) {stocké dans \texttt{thread\_s} (user)};
+    at (4.2, -0.45) {stocké dans \texttt{thread\_s} (user)};
 
   % ── Why uint32_t and not int ────────────────────────────────────────
   \node[draw, fill=gray!10, rounded corners=4pt,
-        minimum width=8.5cm, minimum height=0.75cm,
+        minimum width=8.5cm, minimum height=1.1cm,
         font=\scriptsize, align=center]
-    at (0, -1.65)
-    {\texttt{uint32\_t} et non \texttt{int} : taille \textbf{exactement} 32 bits garantie,
-     non signé, opérations bit à bit bien définies};
+    at (0, -2.65)
+    {\texttt{uint32\_t} et non \texttt{int} : taille de \texttt{int} variable \\selon l'architecture
+     (ex: x86 32-bit, x86\_64 64-bit) \\ \texttt{uint32\_t} garantit \textbf{exactement} 32 bits, non signé};
 
 \end{tikzpicture}
 \end{frame}
@@ -156,7 +156,7 @@
   \node[th] (ta) at (-3.5, 0) {};
   \node[font=\small\bfseries] at (-3.5, 1.1) {Thread A};
   \node[font=\scriptsize, align=center] at (-3.5, 0.2)
-    {\texttt{thread\_kill(B, sig)}\\$\Downarrow$\\\texttt{pending\_signals}\\set bit $\mathit{sig}$};
+    {\texttt{thread\_kill(B, sig)}\\$\Downarrow$\\ met le bit \texttt{sig} de\\ \texttt{pending\_signals} à 1};
 
   % Thread B
   \node[th] (tb) at (3.5, 0) {};
@@ -171,13 +171,17 @@
   \node[draw, fill=orange!20, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.7cm, font=\footnotesize, align=center]
     (del) at (0, -2.2)
-    {\texttt{deliver\_pending\_signals()}\\appelé après chaque \texttt{thread\_yield()}};
+    {\texttt{deliver\_pending\_signals()}\\appelé dès que ce thread prend la main};
 
   \draw[arr, blue!60] (tb.south) |- (del.east);
 
   \node[draw, fill=green!15, rounded corners=3pt,
-        font=\scriptsize, align=center] at (3.5, -3.3)
-    {\texttt{thread\_sigwait} : bloque passivement\\jusqu'à réception du signal};
+        font=\scriptsize, align=center] (sw) at (3.5, -4.3)
+    {\texttt{thread\_sigwait(set, \&signo)} : se met BLOCKED\\dans \texttt{blockedQueue}
+           jusqu'à ce qu'un signal\\de \texttt{set} arrive (\texttt{thread\_kill} l'envoie)
+           \\\texttt{*signo} $\leftarrow$ numéro du signal reçu};
+
+  \draw[arr, green!60!black] (tb.south) -- (sw.north);
 \end{tikzpicture}
 \end{frame}
 
