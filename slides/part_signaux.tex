@@ -2,6 +2,146 @@
 \section{Signaux inter-threads et détection de deadlocks}
 %==========================================================
 
+% ── SLIDE 1 : POSIX signals — single address-space column ──────────────
+% cw=4.2  kb=4.8  ch=7.8  all hardcoded to avoid TikZ macro issues
+\begin{frame}{Signaux POSIX : passages mode utilisateur $\leftrightarrow$ noyau}
+\centering
+\begin{tikzpicture}[scale=0.86]
+
+  % ── backgrounds : utilisateur en haut, noyau en bas ─────────────────
+  \fill[blue!10]   (0, 3.0) rectangle (4.2, 7.8);   % user (top)
+  \fill[orange!14] (0, 0.0) rectangle (4.2, 3.0);   % kernel (bottom)
+
+  % highlighted kernel row — sigprocmask only
+  \fill[orange!40] (0, 1.2) rectangle (4.2, 1.8);
+
+  % highlighted user rows
+  \fill[gray!22]   (0, 3.0) rectangle (4.2, 3.6);   % pile
+  \fill[green!28]  (0, 4.8) rectangle (4.2, 5.4);   % alarm_handler
+  \fill[blue!28]   (0, 6.0) rectangle (4.2, 6.6);   % PC
+
+  % ── grid ────────────────────────────────────────────────────────────
+  \draw[thick] (0, 0) rectangle (4.2, 7.8);
+  \foreach \y in {0.6,1.2,1.8,2.4,3.0,3.6,4.2,4.8,5.4,6.0,6.6,7.2}
+    \draw[gray!40, thin] (0,\y) -- (4.2,\y);
+
+  % ── boundary ────────────────────────────────────────────────────────
+  \draw[red!65, very thick, dashed] (-0.2, 3.0) -- (7.9, 3.0);
+
+  % ── kernel labels ───────────────────────────────────────────────────
+  \node[font=\scriptsize] at (2.1, 1.50) {\texttt{sigprocmask()}};
+  \node[font=\tiny, gray] at (2.1, 0.90) {$\vdots$};
+  \node[font=\tiny, gray] at (2.1, 2.55) {$\vdots$};
+
+  % ── user labels ─────────────────────────────────────────────────────
+  \node[font=\scriptsize]          at (2.1, 3.30) {Pile (stack)};
+  \node[font=\tiny, gray]          at (2.1, 4.20) {$\vdots$};
+  \node[font=\scriptsize]          at (2.1, 5.10) {\texttt{alarm\_handler()}};
+  \node[font=\tiny, gray]          at (2.1, 5.70) {$\vdots$};
+  \node[font=\scriptsize\bfseries] at (2.1, 6.30) {Code interrompu (PC)};
+  \node[font=\tiny, gray]          at (2.1, 7.20) {$\vdots$};
+
+  % ── section labels (rotated) ─────────────────────────────────────────
+  \node[font=\small\bfseries, blue!60,         rotate=90] at (-0.65, 5.40) {Utilisateur};
+  \node[font=\small\bfseries, orange!70!black, rotate=90] at (-0.65, 1.50) {Noyau};
+
+  % ── column title ─────────────────────────────────────────────────────
+  \node[font=\small\bfseries] at (2.1, 8.3) {Espace d'adressage virtuel};
+
+  % ── EXECUTION ZIGZAG ────────────────────────────────────────────────
+  % 3 arrows, well-spaced at x = 5.2, 6.0, 6.8
+  % ① timer : noyau → alarm_handler  [blue, UP]
+  \draw[->, >=Stealth, line width=1.3pt, blue!65] (5.2, 1.5) -- (5.2, 5.1);
+  \node[blue!65, font=\tiny, anchor=west] at (5.3, 4.0) {\cn{1} timer};
+
+  % ② sigreturn : alarm_handler → noyau  [red, DOWN]
+  \draw[->, >=Stealth, line width=1.3pt, red!70] (6.8, 5.1) -- (6.8, 1.5);
+  \node[red!70, font=\tiny, anchor=west] at (6.9, 2.0) {\cn{2} sigreturn};
+
+  % ③ reprise : noyau → PC  [blue, UP]
+  \draw[->, >=Stealth, line width=1.3pt, blue!65] (8.8, 1.5) -- (8.8, 6.3);
+  \node[blue!65, font=\tiny, anchor=west] at (8.9, 4.8) {\cn{3} reprise};
+
+  % horizontal connectors
+  \draw[gray!45, thin] (5.2, 5.1) -- (6.8, 5.1);   % handler : ①→②
+  \draw[gray!45, thin] (6.8, 1.5) -- (8.8, 1.5);   % noyau   : ②→③
+
+  \node[font=\footnotesize\bfseries] at (6.0, 8.3) {Exécution};
+
+\end{tikzpicture}
+\end{frame}
+
+% ── SLIDE 2 : Signal mask — POSIX vs uint32_t ──────────────────────────
+\begin{frame}{Masque de signaux : POSIX vs notre implémentation}
+\centering
+\begin{tikzpicture}[scale=0.78]
+
+  % ── POSIX side (left) ───────────────────────────────────────────────
+  \node[font=\small\bfseries, orange!70!black] at (-3.2, 3.2) {Masque POSIX (\texttt{sigset\_t})};
+
+  % 32-bit integer visual (8 groups of 4 bits)
+  \foreach \i in {0,...,7} {
+    \fill[orange!20] ({-5.8 + \i*0.72}, 2.4) rectangle ({-5.8 + \i*0.72 + 0.66}, 2.9);
+    \draw[orange!50] ({-5.8 + \i*0.72}, 2.4) rectangle ({-5.8 + \i*0.72 + 0.66}, 2.9);
+    \node[font=\tiny] at ({-5.8 + \i*0.72 + 0.33}, 2.65) {\texttt{xxxx}};
+  }
+  % bit 0 and bit 31 labels
+  \node[font=\tiny, gray] at (-5.8+0.33,  2.25) {0};
+  \node[font=\tiny, gray] at (-5.8+7*0.72+0.33, 2.25) {31};
+  \node[font=\tiny]       at (-3.2, 2.05) {\texttt{sigset\_t} = entier 32 bits (POSIX)};
+
+  % sigprocmask box
+  \node[draw, fill=red!15, rounded corners=3pt,
+        minimum width=3.5cm, minimum height=0.65cm, font=\scriptsize]
+    (spm) at (-3.2, 1.2) {\texttt{sigprocmask()} — syscall};
+  \node[font=\tiny, gray, align=center] at (-3.2, 0.52)
+    {modifie le masque\\$\Rightarrow$ 1 appel noyau à chaque usage};
+
+  % stored in kernel
+  \node[draw, fill=orange!20, rounded corners=3pt,
+        minimum width=3.5cm, minimum height=0.55cm, font=\scriptsize]
+    at (-3.2, -0.25) {stocké dans \texttt{task\_struct} (noyau)};
+
+  % ── separator ───────────────────────────────────────────────────────
+  \draw[gray!50, thick, dashed] (0, -0.85) -- (0, 3.5);
+  \node[font=\footnotesize\itshape, gray] at (0, -1.1) {vs};
+
+  % ── OUR side (right) ────────────────────────────────────────────────
+  \node[font=\small\bfseries, blue!65] at (3.2, 3.2) {Notre implémentation (\texttt{uint32\_t})};
+
+  % 32-bit integer visual (8 groups of 4 bits)
+  \foreach \i in {0,...,7} {
+    \fill[blue!20] ({0.6 + \i*0.72}, 2.4) rectangle ({0.6 + \i*0.72 + 0.66}, 2.9);
+    \draw[blue!40]  ({0.6 + \i*0.72}, 2.4) rectangle ({0.6 + \i*0.72 + 0.66}, 2.9);
+    \node[font=\tiny] at ({0.6 + \i*0.72 + 0.33}, 2.65) {\texttt{xxxx}};
+  }
+  \node[font=\tiny, gray] at (0.6+0.33,       2.25) {0};
+  \node[font=\tiny, gray] at (0.6+7*0.72+0.33,2.25) {31};
+  \node[font=\tiny]       at (3.2, 2.05) {\texttt{uint32\_t pending\_signals}};
+
+  % no syscall
+  \node[draw, fill=green!18, rounded corners=3pt,
+        minimum width=3.5cm, minimum height=0.65cm, font=\scriptsize]
+    at (3.2, 1.2) {opération bit à bit — 0 syscall};
+  \node[font=\tiny, gray, align=center] at (3.2, 0.52)
+    {modifié avec \texttt{|=} et \texttt{\&=}\\entièrement en espace utilisateur};
+
+  % stored in thread_s
+  \node[draw, fill=blue!15, rounded corners=3pt,
+        minimum width=3.5cm, minimum height=0.55cm, font=\scriptsize]
+    at (3.2, -0.25) {stocké dans \texttt{thread\_s} (user)};
+
+  % ── Why uint32_t and not int ────────────────────────────────────────
+  \node[draw, fill=gray!10, rounded corners=4pt,
+        minimum width=8.5cm, minimum height=0.75cm,
+        font=\scriptsize, align=center]
+    at (0, -1.65)
+    {\texttt{uint32\_t} et non \texttt{int} : taille \textbf{exactement} 32 bits garantie,
+     non signé, opérations bit à bit bien définies};
+
+\end{tikzpicture}
+\end{frame}
+
 % --- User-level signals ---
 \begin{frame}{Signaux inter-threads en espace utilisateur}
 \centering
@@ -15,7 +155,8 @@
   % Thread A
   \node[th] (ta) at (-3.5, 0) {};
   \node[font=\small\bfseries] at (-3.5, 1.1) {Thread A};
-  \node[font=\scriptsize, align=center] at (-3.5, 0.2) {\texttt{thread\_kill(B, sig)}\\$\Downarrow$\\\texttt{pending\_signals}\\set bit $\mathit{sig}$};
+  \node[font=\scriptsize, align=center] at (-3.5, 0.2)
+    {\texttt{thread\_kill(B, sig)}\\$\Downarrow$\\\texttt{pending\_signals}\\set bit $\mathit{sig}$};
 
   % Thread B
   \node[th] (tb) at (3.5, 0) {};
@@ -24,11 +165,9 @@
   \node[field] at (3.5, -0.20) {\texttt{sig\_handlers[32]}};
   \node[field] at (3.5, -0.75) {\texttt{sigwait\_mask}};
 
-  % kill arrow
   \draw[arr, red!70] (ta.east) -- (tb.west)
     node[midway, above, font=\scriptsize] {\texttt{thread\_kill}};
 
-  % Delivery box
   \node[draw, fill=orange!20, rounded corners=3pt,
         minimum width=3.5cm, minimum height=0.7cm, font=\footnotesize, align=center]
     (del) at (0, -2.2)
@@ -36,7 +175,6 @@
 
   \draw[arr, blue!60] (tb.south) |- (del.east);
 
-  % thread_sigwait
   \node[draw, fill=green!15, rounded corners=3pt,
         font=\scriptsize, align=center] at (3.5, -3.3)
     {\texttt{thread\_sigwait} : bloque passivement\\jusqu'à réception du signal};
@@ -51,16 +189,15 @@
   arr/.style={->, >=Stealth, thick, red!70},
   lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
 ]
-  \node[th] (th0) at (0,  0)   {th0};
+  \node[th] (th0) at (0,    0)    {th0};
   \node[font=\tiny, gray] at (0, -0.9) {(main)};
-  \node[th] (th1) at (4.5,  0) {th1};
+  \node[th] (th1) at (4.5,  0)    {th1};
   \node[th] (th2) at (2.25, -2.8) {th2};
 
   \draw[arr] (th0) to[bend left=20] node[lbl, above] {\texttt{join(th1)}} (th1);
   \draw[arr] (th1) to[bend left=20] node[lbl, right] {\texttt{join(th2)}} (th2);
   \draw[arr] (th2) to[bend left=20] node[lbl, left]  {\texttt{join(th0)}} (th0);
 
-  % Empty readyQueue
   \node[draw, fill=orange!20, rounded corners=3pt,
         minimum width=4.2cm, minimum height=0.65cm, font=\small]
     (rq) at (2.25, -4.5) {\texttt{readyQueue} $= \emptyset$};
@@ -69,7 +206,6 @@
   \draw[->, >=Stealth, gray, dashed] (th1.south) -- (rq.north);
   \draw[->, >=Stealth, gray, dashed] (th2.south) -- (rq.north);
 
-  % EDEADLK
   \node[draw, fill=red!25, rounded corners=3pt,
         minimum width=3.8cm, minimum height=0.65cm, font=\small\bfseries]
     (dead) at (8.0, -2.5) {\texttt{return EDEADLK}};
