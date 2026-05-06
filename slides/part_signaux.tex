@@ -186,37 +186,55 @@
 \end{frame}
 
 % --- Deadlock detection ---
-\begin{frame}{Détection de deadlock}
+\begin{frame}{Détection de DEADLOCK}
 \centering
 \begin{tikzpicture}[
-  th/.style={draw, circle, fill=blue!20, minimum size=1.5cm, font=\small\bfseries, align=center},
-  arr/.style={->, >=Stealth, thick, red!70},
-  lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
+  th/.style={draw, rounded corners=2pt, minimum width=1.2cm,
+             minimum height=0.6cm, font=\footnotesize\bfseries},
+  link/.style={<->, >=Stealth, thin, gray!60},
+  qlbl/.style={font=\scriptsize\bfseries, anchor=east},
 ]
-  \node[th] (th0) at (0,    0)    {th0};
-  \node[font=\tiny, gray] at (0, -0.9) {(main)};
-  \node[th] (th1) at (4.5,  0)    {th1};
-  \node[th] (th2) at (2.25, -2.8) {th2};
+  % ── AVANT (gauche) ───────────────────────────────────────────────────
+  \node[font=\small\bfseries] at (2.2, 2.3) {État courant};
 
-  \draw[arr] (th0) to[bend left=20] node[lbl, above] {\texttt{join(th1)}} (th1);
-  \draw[arr] (th1) to[bend left=20] node[lbl, right] {\texttt{join(th2)}} (th2);
-  \draw[arr] (th2) to[bend left=20] node[lbl, left]  {\texttt{join(th0)}} (th0);
+  % readyQueue : th0 th1
+  \node[qlbl, blue!70]          at (0.0, 1.5) {readyQueue};
+  \node[th, fill=blue!30] (ra) at (0.7, 1.5) {th0};
+  \node[th, fill=blue!20] (rb) at (2.1, 1.5) {th1};
+  \draw[link] (ra.east) -- (rb.west);
 
-  \node[draw, fill=orange!20, rounded corners=3pt,
-        minimum width=4.2cm, minimum height=0.65cm, font=\small]
-    (rq) at (2.25, -4.5) {\texttt{readyQueue} $= \emptyset$};
+  % blockedQueue : th2
+  \node[qlbl, orange!80!black]   at (0.0, 0.5) {blockedQueue};
+  \node[th, fill=orange!30] (ba) at (0.7, 0.5) {th2};
 
-  \draw[->, >=Stealth, gray, dashed] (th0.south) -- (rq.north);
-  \draw[->, >=Stealth, gray, dashed] (th1.south) -- (rq.north);
-  \draw[->, >=Stealth, gray, dashed] (th2.south) -- (rq.north);
+  % ── FLÈCHE TRANSITION ────────────────────────────────────────────────
+  \draw[->, >=Stealth, very thick, red!60] (3.3, 1.0) -- (4.7, 1.0)
+    node[midway, above, font=\tiny, red!70] {th0, th1 se bloquent};
 
+  % ── APRÈS (droite) ───────────────────────────────────────────────────
+  \node[font=\small\bfseries, red!70] at (8.5, 2.3) {DEADLOCK};
+
+  % readyQueue : vide
+  \node[qlbl, blue!70]            at (5.0, 1.5) {readyQueue};
+  \node[font=\normalsize, gray]   at (5.9, 1.5) {$\emptyset$};
+
+  % blockedQueue : th0 th1 th2
+  \node[qlbl, orange!80!black]    at (5.0, 0.5) {blockedQueue};
+  \node[th, fill=orange!30] (da) at (5.7, 0.5) {th1};
+  \node[th, fill=orange!25] (db) at (7.1, 0.5) {th0};
+  \node[th, fill=orange!20] (dc) at (8.5, 0.5) {th2};
+  \draw[link] (da.east) -- (db.west);
+  \draw[link] (db.east) -- (dc.west);
+
+  % EDEADLK
   \node[draw, fill=red!25, rounded corners=3pt,
-        minimum width=3.8cm, minimum height=0.65cm, font=\small\bfseries]
-    (dead) at (8.0, -2.5) {\texttt{return EDEADLK}};
+        minimum width=3.5cm, minimum height=0.6cm, font=\small\bfseries]
+    (dead) at (5.7, -0.8) {\texttt{return EDEADLK}};
+  \draw[->, >=Stealth, thick, red!70] (da.south) -- (dead.north);
 
-  \draw[->, >=Stealth, very thick, red!70] (rq.east) -| (dead.south);
+  \node[font=\scriptsize, gray, align=center] at (5.7, -1.65)
+    {détecté dans \texttt{thread\_join} :\\
+     \texttt{readyQueue} $= \emptyset$ avant de se bloquer $\Rightarrow$ personne ne peut nous réveiller};
 
-  \node[font=\scriptsize, gray, align=center] at (8.0, -4.0)
-    {detecte dans \texttt{thread\_join}};
 \end{tikzpicture}
 \end{frame}
