@@ -195,7 +195,7 @@
   qlbl/.style={font=\scriptsize\bfseries, anchor=east},
 ]
   % ── AVANT (gauche) ───────────────────────────────────────────────────
-  \node[font=\small\bfseries] at (2.2, 2.3) {État courant};
+  \node[font=\small\bfseries] at (0.2, 2.3) {État courant};
 
   % readyQueue : th0 th1
   \node[qlbl, blue!70]          at (0.0, 1.5) {readyQueue};
@@ -212,7 +212,7 @@
     node[midway, above, font=\tiny, red!70] {th0, th1 se bloquent};
 
   % ── APRÈS (droite) ───────────────────────────────────────────────────
-  \node[font=\small\bfseries, red!70] at (8.5, 2.3) {DEADLOCK};
+  \node[font=\small\bfseries, red!70] at (6.5, 2.3) {DEADLOCK};
 
   % readyQueue : vide
   \node[qlbl, blue!70]            at (5.0, 1.5) {readyQueue};
