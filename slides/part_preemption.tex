@@ -32,12 +32,65 @@
 \end{tikzpicture}
 \end{frame}
 
+% --- Cooperative scheduling ---
+\begin{frame}{Ordonnancement coopératif : \texttt{thread\_yield()}}
+\centering
+\begin{tikzpicture}[scale=0.85,
+  th/.style={draw, rounded corners=2pt, minimum width=1.3cm,
+             minimum height=0.6cm, font=\footnotesize\bfseries},
+  link/.style={<->, >=Stealth, thin, gray!60},
+  qlbl/.style={font=\scriptsize\bfseries, anchor=east},
+]
+  % ── AVANT ────────────────────────────────────────────────────────────
+  \node[font=\small\bfseries] at (2.8, 2.6) {Avant \texttt{thread\_yield()}};
+
+  \node[qlbl, blue!70]            at (0.6, 1.8) {\texttt{readyQueue}};
+  \node[th, fill=blue!30] (ra)    at (1.5, 1.8) {th1};
+  \node[th, fill=blue!20] (rb)    at (3.0, 1.8) {th2};
+  \node[th, fill=blue!12] (rc)    at (4.5, 1.8) {th3};
+  \draw[link] (ra.east) -- (rb.west);
+  \draw[link] (rb.east) -- (rc.west);
+
+  \node[qlbl, green!60!black]     at (0.6, 0.7) {\texttt{current}};
+  \node[th, fill=green!30]        at (1.5, 0.7) {th0};
+
+  % ── TRANSITION ────────────────────────────────────────────────────────
+  \draw[->, >=Stealth, very thick, red!60] (5.8, 1.4) -- (7.2, 1.4)
+    node[midway, above, font=\tiny\bfseries, red!70] {thread\_yield()};
+
+  % ── APRÈS ────────────────────────────────────────────────────────────
+  \node[font=\small\bfseries] at (10.5, 2.6) {Après \texttt{thread\_yield()}};
+
+  \node[qlbl, blue!70]             at (7.8, 1.8) {\texttt{readyQueue}};
+  \node[th, fill=blue!20] (da)     at (8.7, 1.8) {th2};
+  \node[th, fill=blue!12] (db)     at (10.2, 1.8) {th3};
+  \node[th, fill=blue!30] (dc)     at (11.7, 1.8) {th0};
+  \draw[link] (da.east) -- (db.west);
+  \draw[link] (db.east) -- (dc.west);
+
+  \node[qlbl, green!60!black]      at (7.8, 0.7) {\texttt{current}};
+  \node[th, fill=green!30]         at (8.7, 0.7) {th1};
+
+  % ── Étapes ────────────────────────────────────────────────────────────
+  \node[draw, fill=gray!10, rounded corners=4pt,
+        text width=12cm, font=\scriptsize, align=center, inner sep=6pt]
+    at (6.2, -0.5)
+    {\cn{1} \texttt{TAILQ\_FIRST} → th1 dépilé \quad
+     \cn{2} th0 → READY, réinséré en queue \quad
+     \cn{3} \texttt{setjmp}/\texttt{longjmp} : échange de contexte};
+
+\end{tikzpicture}
+\end{frame}
+
 % --- Preemption ---
 \begin{frame}{Préemption (\texttt{USE\_PREEM})}
 \centering
 \begin{tikzpicture}[
   bar/.style={draw, minimum height=0.8cm, font=\small},
+  box/.style={draw, rounded corners=3pt, font=\scriptsize, align=center},
+  arr/.style={->, >=Stealth, thick},
 ]
+  % ── Timeline ──────────────────────────────────────────────────────────
   \draw[->, >=Stealth, thick] (0, 0) -- (11, 0) node[right] {temps};
   \node[left, font=\small] at (0, 0.4) {CPU};
 
@@ -53,11 +106,80 @@
   \draw[red!80, dashed, thin] (8.0, 0) -- (8.0, 2.5);
 
   \draw[<->, gray, thin] (4.0, 2.4) -- (8.0, 2.4)
-    node[midway, above, font=\scriptsize] {\texttt{setitimer} 10 ms};
+    node[midway, above, font=\scriptsize] {\texttt{setitimer(ITIMER\_VIRTUAL, 10\,ms)}};
 
-  \node[draw, fill=yellow!25, rounded corners=3pt,
-        font=\scriptsize, align=center] at (5.5, -1.1)
-    {\texttt{signals\_blocked > 0} $\Rightarrow$ handler ignoré (section critique protégée)};
+  % ── alarm_handler decision ────────────────────────────────────────────
+  \node[font=\scriptsize\itshape, gray] at (5.5, -0.7) {\texttt{alarm\_handler}};
+  \draw[arr, gray!45, thin] (5.5, -0.15) -- (5.5, -1.15);
+
+  \node[draw, diamond, aspect=3.2, fill=yellow!20, font=\scriptsize]
+    (dec) at (5.5, -1.6) {\texttt{signals\_blocked} == 0 ?};
+
+  \node[box, fill=green!18, minimum width=3cm] (yes) at (2.0, -2.9)
+    {\texttt{thread\_yield()}\\préemption effective};
+  \node[box, fill=gray!18, minimum width=3cm]  (no)  at (9.0, -2.9)
+    {ignoré\\(section critique)};
+
+  \draw[arr] (dec) -- node[left,  font=\tiny] {oui} (2.0, -2.55);
+  \draw[arr] (dec) -- node[right, font=\tiny] {non} (9.0, -2.55);
+
+\end{tikzpicture}
+\end{frame}
+
+% --- Critical sections ---
+\begin{frame}{Sections critiques : \texttt{signals\_blocked}}
+\centering
+\begin{tikzpicture}[
+  box/.style={draw, rounded corners=3pt, font=\scriptsize, align=center},
+  arr/.style={->, >=Stealth, thick},
+]
+  % ── Timeline ──────────────────────────────────────────────────────────
+  \draw[->, >=Stealth, thick] (-0.5, 0) -- (12.5, 0) node[right] {temps};
+
+  % Zone normale gauche
+  \fill[green!12] (0.0, -0.4) rectangle (2.5, 0.4);
+  \draw[green!40, thin] (0.0, -0.4) rectangle (2.5, 0.4);
+
+  % Zone critique (centre)
+  \fill[red!10] (2.5, -0.4) rectangle (8.5, 0.4);
+  \draw[red!30, thin] (2.5, -0.4) rectangle (8.5, 0.4);
+  \node[font=\scriptsize, red!70] at (5.5, 0.0) {section critique};
+
+  % Zone normale droite
+  \fill[green!12] (8.5, -0.4) rectangle (12.0, 0.4);
+  \draw[green!40, thin] (8.5, -0.4) rectangle (12.0, 0.4);
+
+  % Marqueurs lock / unlock
+  \draw[blue!60, thick] (2.5, -0.55) -- (2.5, 0.55);
+  \node[font=\tiny, blue!70, align=center] at (2.5, -1.15)
+    {\texttt{lock\_preem()}\\\texttt{signals\_blocked++}};
+
+  \draw[blue!60, thick] (8.5, -0.55) -- (8.5, 0.55);
+  \node[font=\tiny, blue!70, align=center] at (8.5, -1.15)
+    {\texttt{unlock\_preem()}\\\texttt{signals\_blocked--}};
+
+  % Compteur
+  \node[font=\scriptsize, gray]   at (1.25, -2.0) {counter $= 0$};
+  \node[font=\scriptsize, red!70] at (5.5,  -2.0) {counter $= 1$};
+  \node[font=\scriptsize, gray]   at (10.25,-2.0) {counter $= 0$};
+
+  % SIGVTALRM gauche → yield
+  \draw[red!80, very thick, ->] (1.25, 1.8) -- (1.25, 0.5);
+  \node[box, fill=green!18, minimum width=1.8cm] at (1.25, 2.3) {yield};
+  \node[font=\tiny, red!80] at (1.9, 1.2) {\texttt{SIGVTALRM}};
+
+  % SIGVTALRM centre → ignoré
+  \draw[red!40, ->] (5.5, 1.8) -- (5.5, 0.5);
+  \node[box, fill=gray!20, minimum width=1.8cm, draw=red!25] at (5.5, 2.3)
+    {\color{gray}ignoré};
+  \node[font=\tiny, red!40] at (6.15, 1.2) {\texttt{SIGVTALRM}};
+  \draw[red!55, thick] (4.6, 2.0) -- (6.4, 2.6);
+
+  % SIGVTALRM droit → yield
+  \draw[red!80, very thick, ->] (10.25, 1.8) -- (10.25, 0.5);
+  \node[box, fill=green!18, minimum width=1.8cm] at (10.25, 2.3) {yield};
+  \node[font=\tiny, red!80] at (10.9, 1.2) {\texttt{SIGVTALRM}};
+
 \end{tikzpicture}
 \end{frame}
 
