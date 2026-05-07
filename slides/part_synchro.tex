@@ -4,6 +4,9 @@
 
 % --- Stack guard ---
 \begin{frame}{Protection de pile (\texttt{USE\_STACK\_PROT})}
+\begin{block}{Problématique}
+        Les piles des threads sont allouées via \texttt{malloc}. Un débordement (\textit{overflow}) corrompt silencieusement la mémoire des threads voisins.
+    \end{block}
 \centering
 \begin{tikzpicture}[
   blk/.style={draw, minimum height=1.0cm, font=\footnotesize, align=center},
@@ -15,7 +18,7 @@
   \node[blk, fill=green!20, minimum width=4.0cm] (sk)  at (5.0, 0) {Stack\\$\longleftarrow$ croît vers le bas};
 
   \node[font=\tiny, gray] at (0, -0.75)   {\texttt{posix\_memalign}};
-  \node[font=\tiny, red!80] at (2.0,-0.75) {\texttt{PROT\_NONE}};
+  \node[font=\tiny, red!80, align=center] at (2.0,-0.75) {\texttt{PROT\_NONE}\\(avec \texttt{mprotect()})};
 
   % Overflow arrow
   \draw[arr, red!80, very thick] (3.0, 0.5) -- (2.0, 0.5)
@@ -39,117 +42,51 @@
     {\texttt{sigaltstack} : pile de secours pour le handler};
 
   \node[font=\scriptsize, gray, align=center] at (2.0, -1.8)
-    {si la pile du thread est\\entièrement épuisée};
+    {Où est éxecuté le handler ?};
 \end{tikzpicture}
+
+
+\alert{Comportement validé par :} Test 90-stack\_overflow
+
 \end{frame}
 
 % --- Mutex ---
-\begin{frame}{Mutex : attente passive et transfert direct}
-\centering
-\begin{tikzpicture}[
-  th/.style={draw, rounded corners=3pt, fill=blue!20,
-             minimum width=2cm, minimum height=0.65cm, font=\footnotesize},
-  q/.style={draw, fill=orange!20, minimum width=2.5cm,
-            minimum height=0.65cm, font=\scriptsize},
-  arr/.style={->, >=Stealth, thick},
-  lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
-]
-  % Time axis
-  \draw[->, gray, thin] (0, 3.5) -- (0, -3.5) node[below, font=\scriptsize] {temps};
+\begin{frame}{Sémaphores et Mutex : Une Logique Commune}
+    
 
-  % Thread A
-  \node[th] (a1) at (3, 3.0) {Thread A};
-  \node[draw, fill=green!20, rounded corners=2pt,
-        minimum width=2cm, minimum height=0.55cm, font=\scriptsize]
-    at (3, 2.2) {\texttt{lock} (\textbf{OK})};
-
-  \node[draw, fill=gray!15, rounded corners=2pt,
-        minimum width=2cm, minimum height=1.6cm, font=\scriptsize, align=center]
-    (work) at (3, 1.1) {section\\critique};
-
-  \node[draw, fill=red!20, rounded corners=2pt,
-        minimum width=2cm, minimum height=0.55cm, font=\scriptsize]
-    (unlock) at (3, 0.1) {\texttt{unlock}};
-
-  % Thread B
-  \node[th] at (7.5, 3.0) {Thread B};
-  \node[draw, fill=red!20, rounded corners=2pt,
-        minimum width=2cm, minimum height=0.55cm, font=\scriptsize]
-    (lockb) at (7.5, 2.2) {\texttt{lock} (bloqué)};
-
-  % waitingQueue
-  \node[q] (wq) at (5.5, 1.1) {\texttt{waitingQueue}};
-  \draw[arr, red!60] (lockb.south) |- (wq.east)
-    node[lbl, near start, right] {passif};
-
-  % Transfer
-  \draw[arr, green!60!black, very thick] (unlock.east) -| (wq.south)
-    node[lbl, near end, right] {transfert direct};
-
-  % Thread B resumes
-  \node[draw, fill=green!20, rounded corners=2pt,
-        minimum width=2cm, minimum height=0.55cm, font=\scriptsize]
-    (resume) at (7.5, -0.7) {reprend \texttt{lock}};
-
-  \draw[arr, blue!60] (wq.south) |- (resume.west);
-
-  % Atomic note
-  \node[draw, fill=yellow!20, rounded corners=3pt,
-        font=\scriptsize, align=center] at (5.5, -2.3)
-    {\texttt{\_\_sync\_lock\_test\_and\_set} : acquisition atomique\\aucun «~vol~» de verrou possible};
-\end{tikzpicture}
+    \begin{itemize}
+        \item \textbf{Gestion des files d'attente} :
+            \begin{itemize}
+                \item Utilisation d'une \texttt{waitingQueue} de type \texttt{TAILQ}.
+                \item Transition d'état identique : \texttt{RUNNING} $\rightarrow$ \texttt{BLOCKED} lors de l'attente.
+            \end{itemize}
+        \item \textbf{Attente Passive et Atomicité} :
+            \begin{itemize}
+                \item Utilisation des primitives \texttt{\_\_sync} pour garantir l'exclusion mutuelle
+                \item Aucun \texttt{while} d'attente active
+            \end{itemize}
+        \item \textbf{Le passage de verrou} :
+            \begin{itemize}
+                \item \texttt{unlock} et \texttt{post} partagent la même logique : le verrou est directement transféré au prochain thread en attente sans être relâché
+            \end{itemize}
+    \end{itemize}
 \end{frame}
 
-% --- Semaphore + CondVar ---
-\begin{frame}{Sémaphore et variable de condition}
-\centering
-\begin{tikzpicture}[
-  box/.style={draw, rounded corners=3pt, minimum width=3.5cm,
-              minimum height=0.65cm, font=\footnotesize},
-  arr/.style={->, >=Stealth, thick},
-  lbl/.style={font=\scriptsize},
-]
-  % --- Semaphore ---
-  \node[font=\small\bfseries] at (-3.0, 2.5) {Sémaphore};
-
-  \node[draw, fill=teal!20, rounded corners=3pt,
-        minimum width=1.2cm, minimum height=0.9cm, font=\large\bfseries]
-    (cnt) at (-3.0, 1.6) {$k$};
-  \node[lbl, gray] at (-3.0, 1.0) {compteur};
-
-  \node[box, fill=orange!20] (wqs) at (-3.0, 0.0) {\texttt{waitingQueue}};
-
-  % P() path
-  \draw[arr, blue!60] (-1.0, 2.0) node[right, lbl] {\texttt{sem\_wait} (P)} -- (cnt.east);
-  \draw[arr, green!60!black] (-1.0, 1.3) -- (-2.2, 1.3) node[left] {} ;
-  \node[lbl, green!60!black] at (-0.2, 1.3) {$k>0$: décrémente};
-  \draw[arr, red!60] (-1.0, 0.0) -- (wqs.east) node[midway, above, lbl, red!60] {$k=0$: bloque};
-
-  % V() path
-  \draw[arr, orange!70] (-1.0,-1.0) node[right, lbl] {\texttt{sem\_post} (V)} -- (wqs.east)
-    node[midway, above, lbl] {réveille waiter};
-
-  % --- CondVar ---
-  \draw[gray, dashed] (1.2, -1.8) -- (1.2, 2.8);
-
-  \node[font=\small\bfseries] at (5.0, 2.5) {Variable de condition};
-
-  \node[box, fill=blue!15]    (mutex) at (5.0, 1.7) {mutex};
-  \node[box, fill=orange!20]  (wqc)   at (5.0, 0.7) {\texttt{waitingQueue}};
-
-  % cond_wait
-  \draw[arr, red!60] (5.0, 2.4) -- (mutex.north) node[near end, right, lbl] {};
-  \node[lbl, align=left] at (8.5, 1.7) {\texttt{cond\_wait} :\\1. relâche mutex\\2. bloque passivement};
-  \draw[arr, gray, dashed] (5.0, 1.4) -- (wqc.north);
-
-  % signal / broadcast
-  \draw[arr, green!60!black] (8.0, 0.0) -- (wqc.east)
-    node[midway, above, lbl, green!60!black] {\texttt{signal}};
-  \draw[arr, orange!70] (8.0,-0.5) -- (5.8,-0.1)
-    node[midway, below, lbl, orange!70] {\texttt{broadcast} (tous)};
-
-  % re-lock
-  \node[lbl, align=center, gray] at (5.0, -1.0)
-    {au réveil : ré-acquiert mutex};
-\end{tikzpicture}
+\begin{frame}{Variables de Condition}
+               
+\begin{itemize}
+    \item \textbf{Synchronisation logique} : Permet d'attendre la vérification d'une condition sans gaspiller de cycles CPU (attente passive).
+    \item \textbf{Mécanique interne} :
+        \begin{itemize}
+            \item Libération atomique du mutex associé lors du \texttt{wait}.
+            \item Mise en sommeil du thread dans une file d'attente spécifique (\texttt{waitingQueue}).
+            \item Réacquisition obligatoire du mutex au réveil avant de poursuivre.
+        \end{itemize}
+    \item \textbf{Signal vs Broadcast} :
+        \begin{itemize}
+            \item \texttt{Signal} : Réveil ciblé du premier thread de la file.
+            \item \texttt{Broadcast} : Libération de tous les threads pour les changements d'états globaux $\rightarrow$ Utile pour les barrières.
+        \end{itemize}
+\end{itemize}
+                
 \end{frame}
