@@ -20,65 +20,218 @@
   \vfill
 \end{frame}
 
-% --- Preemption ---
-\begin{frame}{Préemption (\texttt{USE\_PREEM})}
-\centering
+
+%=================================================
+% PREEMPTION 1
+%=================================================
+
+\begin{frame}{Préemption : principe et fonctionnement}
+
+\begin{columns}
+
+\column{0.52\textwidth}
+
+\textbf{Objectif :}
+\begin{itemize}
+    \item Interrompre automatiquement un thread
+    \item Éviter qu'un thread monopolise le CPU
+\end{itemize}
+
+\vspace{0.3cm}
+
+\column{0.45\textwidth}
+
+\begin{center}
 \begin{tikzpicture}[
-  bar/.style={draw, minimum height=0.8cm, font=\small},
+    node distance=1.4cm,
+    every node/.style={font=\small},
+    box/.style={
+        draw,
+        rounded corners,
+        minimum width=2.8cm,
+        minimum height=0.9cm,
+        align=center
+    }
 ]
-  \draw[->, >=Stealth, thick] (0, 0) -- (11, 0) node[right] {temps};
-  \node[left, font=\small] at (0, 0.4) {CPU};
 
-  \node[bar, fill=blue!25,   minimum width=4cm]  at (2.0, 0.4) {Thread A};
-  \node[bar, fill=orange!25, minimum width=3cm]  at (6.5, 0.4) {Thread B};
-  \node[bar, fill=blue!25,   minimum width=2cm]  at (9.5, 0.4) {Thread A};
+\node[box, fill=blue!15] (timer) {Timer\\\texttt{setitimer()}};
 
-  \draw[red!80, very thick, ->] (4.0, 2.2) -- (4.0, 0.85)
-    node[near start, right, font=\footnotesize, red!80] {\texttt{SIGVTALRM}};
-  \draw[red!80, dashed, thin] (4.0, 0) -- (4.0, 2.5);
+\node[box, fill=orange!20, below of=timer] (sig) {Signal\\\texttt{SIGVTALRM}};
 
-  \draw[red!80, very thick, ->] (8.0, 2.2) -- (8.0, 0.85);
-  \draw[red!80, dashed, thin] (8.0, 0) -- (8.0, 2.5);
+\node[box, fill=green!20, below of=sig] (handler) {Handler};
 
-  \draw[<->, gray, thin] (4.0, 2.4) -- (8.0, 2.4)
-    node[midway, above, font=\scriptsize] {\texttt{setitimer} 10 ms};
+\node[box, fill=red!20, below of=handler] {\texttt{thread\_yield()}};
 
-  \node[draw, fill=yellow!25, rounded corners=3pt,
-        font=\scriptsize, align=center] at (5.5, -1.1)
-    {\texttt{signals\_blocked > 0} $\Rightarrow$ handler ignoré (section critique protégée)};
+\draw[-{Latex[length=2mm]}] (timer) -- (sig);
+\draw[-{Latex[length=2mm]}] (sig) -- (handler);
+\draw[-{Latex[length=2mm]}] (handler) -- ++(0,-0.6);
+
 \end{tikzpicture}
+\end{center}
+
+\end{columns}
+
 \end{frame}
 
-% --- Priority + aging ---
-\begin{frame}{Priorités dynamiques et vieillissement (\texttt{USE\_PRIORITY})}
-\centering
+%=================================================
+% PREEMPTION 2
+%=================================================
+
+\begin{frame}[fragile]{Protection des sections critiques}
+
+\textbf{Problème :}
+
+\vspace{0.2cm}
+
+Une interruption pendant une modification du scheduler peut :
+\begin{itemize}
+    \item corrompre les listes chaînées
+    \item perdre des threads
+    \item provoquer un comportement incohérent
+\end{itemize}
+
+\begin{columns}
+
+\column{0.4\textwidth}
+
+\begin{block}{\small Blocage}
+\small
+\begin{verbatim}
+lock_preemption(){
+  signals_blocked++;
+}
+\end{verbatim}
+\end{block}
+
+\column{0.4\textwidth}
+
+\begin{block}{\small Réactivation}
+\small
+\begin{verbatim}
+unlock_preemption(){
+  signals_blocked--;
+}
+\end{verbatim}
+\end{block}
+
+\end{columns}
+
+\vspace{1cm}
+
+\textbf{\small Structures protégées :} {\small \texttt{readyQueue} / \texttt{blockedQueue} / \texttt{currentThread}}
+
+\end{frame}
+
+%=================================================
+% AGING 1
+%=================================================
+
+\begin{frame}{Principe du Aging}
+
+\textbf{Objectif :}
+\begin{itemize}
+    \item Éviter qu’un thread attende trop longtemps
+    \item Améliorer l’équité du scheduler
+\end{itemize}
+
+\vspace{0.5cm}
+
+\textbf{Principe utilisé :}
+\begin{itemize}
+    \item Chaque thread possède une priorité
+    \item Plus un thread attend dans la \texttt{readyQueue},
+    plus sa priorité augmente
+\end{itemize}
+
+\vspace{0.6cm}
+
+\begin{center}
 \begin{tikzpicture}[
-  tbox/.style={draw, rounded corners=2pt, minimum width=1.6cm,
-               minimum height=0.65cm, font=\footnotesize\bfseries},
-  arr/.style={->, >=Stealth, thick, blue!60},
-  lbl/.style={font=\scriptsize},
+    every node/.style={font=\small}
 ]
-  \node[font=\small\bfseries] at (1.2, 2.5) {Avant \texttt{thread\_yield()}};
-  \node[tbox, fill=blue!35] at (0.0, 1.7) {prio = 3};
-  \node[tbox, fill=blue!22] at (1.7, 1.7) {prio = 6};
-  \node[tbox, fill=blue!12] at (3.4, 1.7) {prio = 9};
-  \node[tbox, fill=blue!6]  at (5.1, 1.7) {prio = 10};
 
-  \draw[arr] (5.9, 1.7) -- (6.7, 1.7) node[midway, above, lbl] {yield};
+\node[draw, rounded corners, fill=red!20]
+(B1) at (0,0) {10};
 
-  \node[font=\small\bfseries] at (9.5, 2.5) {Après \texttt{thread\_yield()}};
-  \node[tbox, fill=blue!35] at (7.0, 1.7) {prio = 2};
-  \node[tbox, fill=blue!22] at (8.7, 1.7) {prio = 5};
-  \node[tbox, fill=blue!12] at (10.4,1.7) {prio = 8};
-  \node[tbox, fill=orange!35] at (12.1,1.7) {prio = 10};
-  \node[lbl, orange!70!black, align=center] at (12.1,1.1) {thread\\remis à 10};
+\node[draw, rounded corners, fill=orange!20]
+(B2) at (2.5,0) {7};
 
-  \draw[decorate, decoration={brace, amplitude=5pt, mirror}, gray]
-    (6.6, 1.35) -- (10.8, 1.35)
-    node[midway, below=7pt, lbl, gray] {$-1$ à chaque yield (vieillissement)};
+\node[draw, rounded corners, fill=yellow!20]
+(B3) at (5,0) {3};
 
-  \node[draw, fill=green!15, rounded corners=3pt, font=\footnotesize, align=center]
-    at (6.0, -0.4)
-    {Aucune famine : un thread attend longtemps $\Rightarrow$ prio $\to$ 0 $\Rightarrow$ tête de file};
+\node[draw, rounded corners, fill=green!20]
+(B4) at (7.5,0) {1};
+
+\draw[-{Latex[length=2mm]}] (B1) -- (B2);
+\draw[-{Latex[length=2mm]}] (B2) -- (B3);
+\draw[-{Latex[length=2mm]}] (B3) -- (B4);
+
 \end{tikzpicture}
+\end{center}
+
+\vspace{0.4cm}
+
+\begin{block}{Idée clé}
+Un thread ancien devient progressivement prioritaire.
+\end{block}
+
+\end{frame}
+
+
+
+%=================================================
+% AGING 2
+%=================================================
+\begin{frame}[fragile]{Implémentation dans le scheduler}
+
+\textbf{Mise à jour des priorités dans \texttt{thread\_yield()} :}
+
+\vspace{0.3cm}
+
+\begin{block}{Aging des threads en attente}
+\small
+\begin{verbatim}
+TAILQ_FOREACH(it, &readyQueue, entries) {
+    if (it->priority > 0) {
+        it->priority--;
+    }
+}
+\end{verbatim}
+\end{block}
+
+\vspace{0.5cm}
+
+\textbf{Fonctionnement :}
+\begin{itemize}
+    \item À chaque changement de contexte :
+    \begin{itemize}
+        \item les threads en attente gagnent en priorité
+    \end{itemize}
+
+    \item Le thread exécuté est réinitialisé (priority = 10) :
+\end{itemize}
+
+\end{frame}
+
+%=================================================
+% AGING 3
+%=================================================
+\begin{frame}[fragile]{\texttt{enqueue\_ready} : insertion dans la readyQueue}
+
+\textbf{Principe :} la position dépend uniquement de la priorité.
+
+\vspace{0.3cm}
+
+\begin{block}{Code}
+\small
+\begin{verbatim}
+TAILQ_FOREACH(iter, &readyQueue, entries) {
+    if (t->priority < iter->priority) {
+        TAILQ_INSERT_BEFORE(iter, t, entries);
+        return;
+    }
+}
+\end{verbatim}
+\end{block}
+
 \end{frame}
